@@ -1,9 +1,9 @@
 # Crowd Psychology State Engine (CPSE)
 
-## 🎯 Project Purpose
+## Project Purpose
 CPSE is a modular, real-time classification system designed to infer the psychological state of a crowd from non-identifying, privacy-preserving signals. It aims to prevent crowd-related incidents by providing early warnings and non-force intervention recommendations.
 
-## ⚙️ Architecture
+## Architecture
 - **signals**: Fetches data from external APIs (TomTom Flow & Search) or simulation. Includes interactive geocoding.
 - **data_layer**: Standardizes inputs into **Crowd State Vectors** for ML/Analytics readiness.
 - **metrics**: Computes crowd dynamics like compression gradients and velocity variance.
@@ -17,7 +17,7 @@ CPSE is a modular, real-time classification system designed to infer the psychol
     - **Live Telemetry**: Real-time Speed, Congestion, and computed Velocity Variance.
     - **Anomaly Alerts**: Visual flags for "Unusual Events".
 
-## 🚀 Setup & Usage
+## Setup & Usage
 
 ### 1. Install Dependencies
 ```bash
@@ -49,12 +49,12 @@ Run the unit test suite:
 python -m unittest discover tests
 ```
 
-## 🧠 Design Philosophy
+## Design Philosophy
 - **Privacy First**: No PII is collected. only aggregate flow data.
 - **Explainable**: Rule-based logic ensures transparency in classification.
 - **Advisory**: The system provides recommendations, not automated enforcement.
 
-## 📄 Documentation
+## Documentation
 - [Phase Plan](documents/phase_plan.md): Development roadmap.
 - [Sanity Check](documents/sanity_check.md): Latest code review and security audit.
 - [Metrics Guide](documents/metrics.md): Detailed explanation of all system metrics and formulas.
