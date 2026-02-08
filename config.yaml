@@ -1,0 +1,33 @@
+# CPSE Configuration
+api:
+  tomtom:
+    # Set this to true to use env var
+    use_env_key: true
+    env_key_name: "TOMTOM_API_KEY"
+    base_url: "https://api.tomtom.com/traffic/services/4/flowSegmentData"
+    search_url: "https://api.tomtom.com/search/2/search"
+
+  openweathermap:
+    # Set this to true to use env var
+    use_env_key: true
+    env_key_name: "OPENWEATHERMAP_API_KEY"
+    base_url: "https://api.openweathermap.org/data/2.5/weather"
+
+location:
+  # Example: Delhi approx bounding box or point center
+  name: "Delhi City Center"
+  lat: 28.6139
+  lon: 77.2090
+  radius: 2000 # meters
+
+# Classification thresholds
+thresholds:
+  compression_gradient:
+    stable: 0.1
+    compressing: 0.5
+    volatile: 0.8
+  velocity_variance:
+    high: 2.0  # arbitrary unit for now
+
+simulation:
+  enabled: true # Fallback to simulation if API fails or key missing
