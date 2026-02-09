@@ -144,7 +144,7 @@ with st.sidebar:
             sel = options[selected_option]
             new_loc = {'lat': sel['lat'], 'lon': sel['lon'], 'name': sel['name']}
             
-            # Smart Reset: Only reset if location changes
+            # Only reset if location changes
             current = st.session_state.location
             if current.get('lat') != new_loc['lat'] or current.get('lon') != new_loc['lon']:
                 st.session_state.history = []
@@ -234,8 +234,6 @@ with st.sidebar:
         - **Signals**: TomTom Traffic API
         - **Privacy**: No PII collected.
         - **Anomaly**: Statistical profiling (Z-Score).
-        
-        *See README.md for full details.*
         """)
 
 # --- MAIN CONTENT ---
