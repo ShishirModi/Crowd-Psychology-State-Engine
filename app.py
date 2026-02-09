@@ -142,10 +142,17 @@ with st.sidebar:
         
         if st.button("Update Monitor"):
             sel = options[selected_option]
-            st.session_state.location = {'lat': sel['lat'], 'lon': sel['lon'], 'name': sel['name']}
-            st.session_state.history = [] # Reset history on change
-            st.session_state.metrics = CrowdMetrics() # Reset metrics
-            del st.session_state.search_results # Clear search
+            new_loc = {'lat': sel['lat'], 'lon': sel['lon'], 'name': sel['name']}
+            
+            # Smart Reset: Only reset if location changes
+            current = st.session_state.location
+            if current.get('lat') != new_loc['lat'] or current.get('lon') != new_loc['lon']:
+                st.session_state.history = []
+                st.session_state.metrics = CrowdMetrics()
+                st.session_state.anomaly_detector = AnomalyDetector() # Explicit reset
+            
+            st.session_state.location = new_loc
+            del st.session_state.search_results
             st.rerun()
 
     st.markdown("---")
