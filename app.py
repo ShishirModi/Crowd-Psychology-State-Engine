@@ -110,11 +110,65 @@ if 'location' not in st.session_state:
 if 'is_running' not in st.session_state:
     st.session_state.is_running = False
 
-# Load modules
-signal_provider = get_signal_provider()
-geocoder = TomTomGeocoder()
-classifier = CrowdClassifier()
-recommender = InterventionRecommender()
+# --- AUTHENTICATION ---
+def check_password():
+    """Returns `True` if the user had a correct password."""
+    
+    # Check if password is set in secrets, otherwise default to "public" for dev
+    # In Streamlit Cloud, set "APP_PASSWORD" in secrets.toml
+    # Supports single string or list of strings
+    valid_passwords = ["cpseisawesome"] # Default
+    
+    if "APP_PASSWORD" in st.secrets:
+        secret_val = st.secrets["APP_PASSWORD"]
+        if isinstance(secret_val, list):
+            valid_passwords = secret_val
+        else:
+            valid_passwords = [str(secret_val)]
+
+    def password_entered():
+        """Checks whether a password entered by the user is correct."""
+        if st.session_state["password"] in valid_passwords:
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # don't store password
+        else:
+            st.session_state["password_correct"] = False
+
+    if "password_correct" not in st.session_state:
+        # First run, show input
+        st.text_input(
+            "Please enter the application password", type="password", on_change=password_entered, key="password"
+        )
+        return False
+    elif not st.session_state["password_correct"]:
+        # Password incorrect, show input + error
+        st.text_input(
+            "Please enter the application password", type="password", on_change=password_entered, key="password"
+        )
+        st.error("😕 Password incorrect")
+        return False
+    else:
+        # Password correct
+        return True
+
+if not check_password():
+    st.stop()
+
+# --- SERVICE INITIALIZATION (PER SESSION) ---
+# Initialize services in session_state to ensure isolation between users
+if 'services' not in st.session_state:
+    st.session_state.services = {
+        'signal_provider': get_signal_provider(),
+        'geocoder': TomTomGeocoder(),
+        'classifier': CrowdClassifier(),
+        'recommender': InterventionRecommender()
+    }
+
+# Access services from session state
+signal_provider = st.session_state.services['signal_provider']
+geocoder = st.session_state.services['geocoder']
+classifier = st.session_state.services['classifier']
+recommender = st.session_state.services['recommender']
 
 # --- SIDEBAR ---
 with st.sidebar:
