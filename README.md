@@ -58,3 +58,4 @@ python -m unittest discover tests
 - [Phase Plan](documents/phase_plan.md): Development roadmap.
 - [Sanity Check](documents/sanity_check.md): Latest code review and security audit.
 - [Metrics Guide](documents/metrics.md): Detailed explanation of all system metrics and formulas.
+- [Deployment Guide](documents/deployment.md): Instructions for deploying to Streamlit Community Cloud.
