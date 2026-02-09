@@ -29,13 +29,19 @@ class CrowdMetrics:
         
         if len(data) >= 5:
             x = np.arange(len(data))
+            # Check if x or data has zero variance implicitly handled by polyfit but explicit is good
             slope, _ = np.polyfit(x, data, 1)
         else:
             slope = delta
             
         w_level = 0.6
         w_slope = 0.4
-        metric = (w_level * current_level) + (w_slope * max(0.0, slope * 5))
+        
+        # Clip negative slope contribution to avoid masking high density?
+        # Actually negative slope means decongesting, so it should reduce risk.
+        # But let's keep it simple.
+        
+        metric = (w_level * current_level) + (w_slope * slope * 5)
         return max(0.0, min(1.0, metric))
 
     def compute_velocity_variance(self):
@@ -53,7 +59,17 @@ class CrowdMetrics:
         speeds = np.array(self.speed_history)
         variance = np.var(speeds)
         
-        # Normalize? 
-        # If variance is 100 (e.g. speed jumps 40 <-> 60), that is high.
-        # If variance is 0, steady flow.
+        # Calculate Coefficient of Variation (CV) squared if possible? 
+        # Or just keep raw variance but note it depends on speed scale.
+        # If mean speed is 100kmh, variance of 25 is small.
+        # If mean speed is 10kmh, variance of 25 is huge.
+        
+        mean_speed = np.mean(speeds)
+        if mean_speed > 5.0:
+            # Normalize variance relative to mean speed
+            # CV = sigma / mean -> Variance_Norm = (sigma^2) / (mean^2) * 1000 to scale up?
+            # Let's stick to raw variance but cap it, as per original logic, 
+            # but maybe log it?
+            pass
+            
         return float(variance)

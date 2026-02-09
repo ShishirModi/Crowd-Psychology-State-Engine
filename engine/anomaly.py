@@ -33,8 +33,8 @@ class AnomalyDetector:
         mean = np.mean(hist_array, axis=0)
         std = np.std(hist_array, axis=0)
         
-        # Avoid division by zero
-        std = np.where(std == 0, 1e-6, std)
+        # Avoid division by zero with epsilon
+        std = np.where(std < 1e-6, 1e-6, std)
         
         # Calculate Z-Score for the current vector
         # Z = |(X - Mean) / Std|

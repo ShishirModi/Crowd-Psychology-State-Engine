@@ -8,10 +8,12 @@ def scrub_sensitive_data(text):
     if not isinstance(text, str):
         text = str(text)
         
-    # Regex to catch key=VALUE pairs in URLs or strings
-    # Matches key/api_key/apiKey followed by optional whitespace, =, and non-whitespace characters
-    pattern = r'(key|api_?key|apiKey)\s*=\s*([^\s&]+)'
+    # Regex to catch key=VALUE pairs in URLs or strings (e.g. key=12345)
+    url_pattern = r'(key|api_?key|apiKey|appid)\s*=\s*([^\s&]+)'
+    text = re.sub(url_pattern, r'\1=REDACTED', text, flags=re.IGNORECASE)
     
-    # Replace with key=REDACTED
-    scrubbed = re.sub(pattern, r'\1=REDACTED', text, flags=re.IGNORECASE)
-    return scrubbed
+    # Regex for JSON style "key": "value"
+    json_pattern = r'("key"|"api_?key"|"apiKey"|"appid")\s*:\s*"([^"]+)"'
+    text = re.sub(json_pattern, r'\1: "REDACTED"', text, flags=re.IGNORECASE)
+    
+    return text

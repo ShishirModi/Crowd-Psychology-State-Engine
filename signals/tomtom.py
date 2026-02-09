@@ -53,8 +53,9 @@ class TomTomSignal:
             # TomTom Flow Segment Data returns data for the segment closest to the given coordinates
             # Format: https://{baseUrl}/traffic/services/4/flowSegmentData/absolute/10/json?key={apiKey}&point={point}
             
-            lat = self.location.get('lat')
-            lon = self.location.get('lon')
+            # Format coordinates to 5 decimal places (TomTom best practice)
+            lat = round(self.location.get('lat'), 5)
+            lon = round(self.location.get('lon'), 5)
             point = f"{lat},{lon}"
             
             # Construct URL manually or use params. TomTom documentation specifies structure.
@@ -73,13 +74,17 @@ class TomTomSignal:
             
             if response.status_code == 403:
                 print("Error: API Key Invalid or Forbidden.")
-                return self._simulate_congestion()
+                return self._simulate_telemetry()
             
             response.raise_for_status()
             data = response.json()
             
             # Parse response
-            flow_data = data.get('flowSegmentData', {})
+            if 'flowSegmentData' not in data:
+                print(f"Warning: 'flowSegmentData' missing in response. Data keys: {list(data.keys())}")
+                return self._simulate_telemetry()
+                
+            flow_data = data['flowSegmentData']
             current_speed = flow_data.get('currentSpeed')
             free_flow_speed = flow_data.get('freeFlowSpeed')
             

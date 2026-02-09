@@ -16,6 +16,7 @@ CPSE is a modular, real-time classification system designed to infer the psychol
     - **Scenario Controls**: Interactive sidebar for simulating Weather, Events, and Infrastructure (Width).
     - **Live Telemetry**: Real-time Speed, Congestion, and computed Velocity Variance.
     - **Anomaly Alerts**: Visual flags for "Unusual Events".
+    - **Security**: Single-tenant isolation & Password authentication.
 
 ## Setup & Usage
 

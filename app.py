@@ -126,9 +126,18 @@ def check_password():
         else:
             valid_passwords = [str(secret_val)]
 
+    import secrets
     def password_entered():
         """Checks whether a password entered by the user is correct."""
-        if st.session_state["password"] in valid_passwords:
+        user_pass = st.session_state["password"]
+        correct = False
+        for valid_pass in valid_passwords:
+            # Use constant-time comparison to prevent timing attacks
+            if secrets.compare_digest(user_pass, valid_pass):
+                correct = True
+                break
+                
+        if correct:
             st.session_state["password_correct"] = True
             del st.session_state["password"]  # don't store password
         else:
@@ -391,8 +400,9 @@ with main_container.container():
         
     with m_col4:
         delta_val = "Normal" if anomaly_score < 2.5 else "Unusual"
-        delta_color = "normal" if anomaly_score < 2.5 else "inverse"
-        st.metric("Anomaly Score", f"{anomaly_score:.2f}", delta=delta_val, delta_color=delta_color)
+        # Inverse: Green if low (Normal), Red if high (Unusual)
+        delta_color = "normal" if anomaly_score < 2.5 else "inverse" 
+        st.metric("Anomaly Score", f"{anomaly_score:.2f}", delta=delta_val, delta_color="inverse")
         st.caption("**Formula**: `Z-Score = (X - Mean) / StdDev`")
         st.caption("*Deviations > 2.5 are statistical anomalies.*")
 
@@ -428,8 +438,11 @@ with main_container.container():
     
         # Map View
         st.subheader("🗺️ Location Map")
-        map_data = pd.DataFrame({'lat': [loc['lat']], 'lon': [loc['lon']]})
-        st.map(map_data, zoom=14)
+        try:
+            map_data = pd.DataFrame({'lat': [loc['lat']], 'lon': [loc['lon']]})
+            st.map(map_data, zoom=14)
+        except Exception as e:
+            st.error(f"Map Error: {e}")
     
     with row3_col2:
         st.subheader("🛡️ Intervention Plan")

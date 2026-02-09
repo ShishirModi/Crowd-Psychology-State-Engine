@@ -29,16 +29,18 @@ Where:
 ### Formula
 The gradient combines the *absolute* density with the *rate of change*:
 
-$$ G = (w_1 \cdot C_{t}) + (w_2 \cdot \max(0, \frac{dC}{dt} \cdot S)) $$
+$$ G = (w_1 \cdot C_{t}) + (w_2 \cdot \frac{dC}{dt} \cdot S) $$
 
 Where:
 - $C_t$: Current Congestion Level.
 - $dC/dt$: Slope of congestion over the last 12 samples (60s).
 - $w_1, w_2$: Weights (currently 0.6 and 0.4).
-- $S$: Scaling factor (5.0) to make slope impact comparable to absolute level.
+- $S$: Scaling factor (5.0).
 
 ### Purpose
-Detects **rapid inflow shocks**. A high gradient means the crowd is densifying faster than the specific location can naturally dissipate, indicating a risk of crush.
+Detects **rapid inflow shocks**.
+- **Positive Slope**: Crowd densifying rapidly -> Increases Risk.
+- **Negative Slope**: Crowd dissipating -> Reduces Risk (offsets high density).
 
 ---
 

@@ -29,3 +29,7 @@ If no secret is found, the password defaults to `cpseisawesome`.
 ## 3. Data Protection
 -   **No Database**: Currently, all history is in-memory (`st.session_state`). When the user closes the tab, data is wiped. This prevents data leaks between sessions.
 -   **Secrets**: API Keys are loaded from `st.secrets` or environment variables, never committed to code.
+
+## 4. Application Hardening
+-   **Timing Attack Protection**: Password verification uses `secrets.compare_digest` (constant-time comparison) to prevent side-channel timing attacks.
+-   **Input Sanitization**: Logs are automatically scrubbed of sensitive keys (API Keys, App IDs) before being output to the console.
