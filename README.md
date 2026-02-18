@@ -50,7 +50,7 @@ SUPABASE_KEY = "your_supabase_key"
 
 > **Note**: `APP_PASSWORD` is mandatory. The first password in the list grants **Admin Console** access.
 
-### 4. Run
+### 3. Run
 
 #### CLI Mode
 Interactively select location and monitor via terminal:
