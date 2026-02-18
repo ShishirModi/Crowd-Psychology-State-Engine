@@ -6,7 +6,8 @@ class TestCrowdMetrics(unittest.TestCase):
         self.metrics = CrowdMetrics(history_size=5)
 
     def test_initial_state(self):
-        self.assertEqual(self.metrics.compute_compression_gradient(), 0.0)
+        grad, quality = self.metrics.compute_compression_gradient()
+        self.assertEqual(grad, 0.0)
         self.assertEqual(self.metrics.compute_velocity_variance(), 0.0)
 
     def test_gradient_computation(self):
@@ -14,7 +15,7 @@ class TestCrowdMetrics(unittest.TestCase):
         for i in range(5):
             self.metrics.update(congestion_level=i*0.1) # 0.0, 0.1, 0.2...
         
-        grad = self.metrics.compute_compression_gradient()
+        grad, quality = self.metrics.compute_compression_gradient()
         self.assertGreater(grad, 0.0, "Gradient should be positive for increasing congestion")
 
     def test_velocity_variance(self):

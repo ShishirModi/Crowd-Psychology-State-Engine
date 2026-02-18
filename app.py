@@ -390,13 +390,19 @@ else:
                 metrics = st.session_state.metrics
                 metrics.update(congestion, current_speed)
                 
-                gradient = metrics.compute_compression_gradient()
+                # Unpack tuple: (gradient, quality)
+                gradient, gradient_quality = metrics.compute_compression_gradient()
                 velocity_var = metrics.compute_velocity_variance()
-            
+
                 # --- Phase 2: Vectorization & Anomaly ---
                 # Access session state instances
                 vectorizer = st.session_state.vectorizer
                 anomaly_detector = st.session_state.anomaly_detector
+                
+                # Check for simulation flag
+                is_simulated = telemetry.get("is_simulated", False)
+                if is_simulated:
+                    st.toast("⚠️ Using Simulated Data", icon="⚠️")
             
                 # Create vectors (incorporating environment from sidebar)
                 crowd_vector = vectorizer.create_state_vector(congestion, velocity_var, gradient)
@@ -408,7 +414,15 @@ else:
                 is_anomaly, anomaly_score = anomaly_detector.update_and_detect(crowd_vector)
                 
                 # Classify with Anomaly Awareness
-                state, confidence = classifier.classify(gradient, velocity_var, anomaly_score)
+                history_len = len(metrics.congestion_history)
+                state, confidence = classifier.classify(
+                    gradient, 
+                    velocity_var, 
+                    anomaly_score,
+                    is_simulated=is_simulated,
+                    history_len=history_len,
+                    gradient_quality=gradient_quality
+                )
                 
                 # Local Time
                 local_time = get_local_time(loc['lat'], loc['lon'])

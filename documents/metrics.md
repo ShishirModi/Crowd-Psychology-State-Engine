@@ -27,9 +27,14 @@ Where:
 **Source**: Internal Calculation (`metrics/compression.py`)
 
 ### Formula
+### Formula
 The gradient combines the *absolute* density with the *rate of change*:
 
 $$ G = (w_1 \cdot C_{t}) + (w_2 \cdot \frac{dC}{dt} \cdot S) $$
+
+Additionally, the **Goodness of Fit ($R^2$)** is calculated for the slope:
+- **High Quality ($R^2 > 0.95$)**: Clean trend, boosts confidence.
+- **Low Quality ($R^2 < 0.8$)**: Noisy signal, reduces confidence.
 
 Where:
 - $C_t$: Current Congestion Level.
@@ -49,16 +54,18 @@ Detects **rapid inflow shocks**.
 **Source**: Internal Calculation (`metrics/compression.py`) based on TomTom Speed History.
 
 ### Formula
-$$ Var(v) = \frac{1}{N} \sum_{i=1}^{N} (v_i - \mu)^2 $$
+We use the **Coefficient of Variation (CV)** to normalize turbulence relative to speed:
+
+$$ CV = \frac{\sigma}{\mu} = \frac{\sqrt{\frac{1}{N} \sum (v_i - \mu)^2}}{\mu} $$
 
 Where:
-- $v_i$: Speed sample at time $i$.
-- $\mu$: Mean speed over the window (N=12 samples).
+- $\sigma$: Standard Deviation of speed.
+- $\mu$: Mean speed over the window.
 
 ### Purpose
-Measures **flow stability**.
-- **Low Variance**: Smooth, laminar flow (even if slow).
-- **High Variance**: Stop-and-go waves, erratic movement. High variance at high density is a precursor to "Crowd Quakes" or stamped behaviors (`Fragmenting` state).
+Measures **flow stability** independent of speed scale.
+- **Low CV (< 0.1)**: Smooth, laminar flow.
+- **High CV (> 0.25)**: Stop-and-go waves, erratic movement. High turbulence at high density is a precursor to "Crowd Quakes".
 
 ---
 
@@ -78,7 +85,7 @@ Where:
 ### Confidence & Initialization
 - **Initialization**: Requires ~20 data points (approx. 10 mins) to build a statistically significant baseline. Until then, score is 0.0.
 - **Threshold**: Scores > 2.5 are flagged as "Unusual Events".
-- **Impact**: If an anomaly is detected, the Classifier's **Confidence Score** is capped at 50% for standard states, reflecting uncertainty about the unusual condition.
+- **Impact**: If an anomaly is detected, the Classifier's **Confidence Score** is penalized.
 
 ---
 
@@ -100,9 +107,17 @@ These factors modulate the interpretation of the core metrics.
 **Type**: Meta-Metric
 **Source**: `engine/classifier.py`
 
-A distinct probability score (0.0 - 1.0) indicating how well the current data fits the classified state prototype.
+A distinct probability score (0.0 - 1.0) indicating how well the current data fits the classified state prototype. It is **dynamically adjusted** based on data quality:
 
+### Factors
+1.  **Metric Distance**: How far is the metric from the state threshold? (Further = Higher Confidence).
+2.  **Gradient Quality ($R^2$)**: Penalizes confidence if the compression trend is noisy ($< 0.8 R^2$).
+3.  **Data Source**: Penalizes confidence (-20%) if using **Simulated Data** (fallback).
+4.  **Warmup**: Penalizes confidence (-30%) if history is short (< 60s).
+5.  **Turbulence**: Penalizes confidence for "Stable" states if turbulence (CV) is high.
+
+### Ranges
 - **Stable**: 0.90+ (Clear signal).
-- **Compressing**: 0.60 - 0.80 (Transition zones).
+- **Compressing**: 0.60 - 0.80 (Transition zones or noisy trends).
 - **Volatile**: 0.80+ (Strong signals of distress).
 - **Anomaly**: Capped at 0.50 (System unsure due to statistical deviation).

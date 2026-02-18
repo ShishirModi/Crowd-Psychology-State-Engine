@@ -17,7 +17,7 @@ CPSE is a modular, real-time classification system designed to infer the psychol
 - **data_layer**: Standardizes inputs into **Crowd State Vectors** for ML/Analytics readiness.
 - **metrics**: Computes crowd dynamics like compression gradients and velocity variance.
 - **Real-time Traffic Analysis**: Integrates **TomTom Traffic API** for live congestion data.
-- **Physics-Based Metrics**: Computes *Compression Gradient* and *Velocity Variance* to detect crush risks.
+- **Physics-Based Metrics**: Computes *Compression Gradient* (with $R^2$ quality check) and *Velocity Variance* (Coefficient of Variation) to detect crush risks.
 - **Anomaly Detection**: Statistical Z-Score profiling to flag unusual crowd behavior.
 - **Admin Dashboard**: Secure database viewer for global telemetry logs.
 - **Data Persistence**: Telemetry history stored in **Supabase (PostgreSQL)**.

@@ -19,30 +19,47 @@ class CrowdMetrics:
     def compute_compression_gradient(self):
         """
         Computes the compression gradient based on congestion history.
+        Returns: (gradient_value, fit_quality)
+        fit_quality is 0.0 to 1.0 (R-squared approximation)
         """
         if len(self.congestion_history) < 2:
-            return 0.0
+            return 0.0, 0.5 # Neutral quality for insufficient data
             
         data = np.array(self.congestion_history)
         current_level = data[-1]
-        delta = data[-1] - data[-2]
+        
+        # Default quality
+        fit_quality = 0.5
+        slope = 0.0
         
         if len(data) >= 5:
             x = np.arange(len(data))
-            # Check if x or data has zero variance implicitly handled by polyfit but explicit is good
-            slope, _ = np.polyfit(x, data, 1)
+            # Polyfit basic linear regression
+            slope, residuals, rank, singular_values, rcond = np.polyfit(x, data, 1, full=True)
+            
+            # Calculate R-squared manually if residuals are present
+            if len(residuals) > 0:
+                ss_res = residuals[0]
+                ss_tot = np.sum((data - np.mean(data))**2)
+                
+                if ss_tot > 1e-6: # Avoid divide by zero for flat line
+                    r_squared = 1 - (ss_res / ss_tot)
+                    fit_quality = max(0.0, min(1.0, r_squared))
+                else:
+                    fit_quality = 1.0 # Perfect fit (flat line)
+            else:
+                 fit_quality = 1.0 # Perfect fit
+                 
+            slope = slope[0] # Polyfit returns [slope, intercept]
         else:
-            slope = delta
+            slope = data[-1] - data[-2]
+            fit_quality = 0.5 # Too few points for reliable R2
             
         w_level = 0.6
         w_slope = 0.4
         
-        # Clip negative slope contribution to avoid masking high density?
-        # Actually negative slope means decongesting, so it should reduce risk.
-        # But let's keep it simple.
-        
         metric = (w_level * current_level) + (w_slope * slope * 5)
-        return max(0.0, min(1.0, metric))
+        return max(0.0, min(1.0, metric)), fit_quality
 
     def compute_velocity_variance(self):
         """
@@ -52,24 +69,19 @@ class CrowdMetrics:
         if len(self.speed_history) < 3:
             return 0.0
             
-        # Standard Deviation / Mean to look at Coefficient of Variation
-        # But simple Variance is requested.
-        # Let's normalize it slightly so it doesn't explode.
-        
         speeds = np.array(self.speed_history)
-        variance = np.var(speeds)
-        
-        # Calculate Coefficient of Variation (CV) squared if possible? 
-        # Or just keep raw variance but note it depends on speed scale.
-        # If mean speed is 100kmh, variance of 25 is small.
-        # If mean speed is 10kmh, variance of 25 is huge.
-        
         mean_speed = np.mean(speeds)
-        if mean_speed > 5.0:
-            # Normalize variance relative to mean speed
-            # CV = sigma / mean -> Variance_Norm = (sigma^2) / (mean^2) * 1000 to scale up?
-            # Let's stick to raw variance but cap it, as per original logic, 
-            # but maybe log it?
-            pass
+        std_dev = np.std(speeds)
+        
+        if mean_speed < 1.0:
+            # If speed is near zero, variance is less meaningful (stopped traffic)
+            # Return raw std dev as a fallback or 0 if truly stopped
+            return float(std_dev)
             
-        return float(variance)
+        # Coefficient of Variation (CV) = Sigma / Mu
+        # normalized to be somewhat comparable to previous logic (0-2 range roughly)
+        # CV of 0.2 (20% fluctation) is high. 
+        # Let's return raw CV for now, classifier will handle scaling.
+        cv = std_dev / mean_speed
+        
+        return float(cv)

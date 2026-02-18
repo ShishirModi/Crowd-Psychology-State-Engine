@@ -92,6 +92,10 @@ class TomTomSignal:
                 print("Warning: Missing speed data in response.")
                 return self._simulate_telemetry()
                 
+            # Sanity Check for zero free-flow
+            if free_flow_speed <= 0:
+                free_flow_speed = 50.0 # Default fallback
+                
             # Calculate congestion
             congestion = 0.0
             if free_flow_speed > 0:
@@ -101,7 +105,8 @@ class TomTomSignal:
             return {
                 "congestion": congestion,
                 "current_speed": current_speed,
-                "free_flow_speed": free_flow_speed
+                "free_flow_speed": free_flow_speed,
+                "is_simulated": False
             }
             
         except Exception as e:
@@ -124,7 +129,8 @@ class TomTomSignal:
         return {
             "congestion": congestion,
             "current_speed": current,
-            "free_flow_speed": free_flow
+            "free_flow_speed": free_flow,
+            "is_simulated": True
         }
 
 # Singleton or factory if needed
