@@ -5,7 +5,18 @@ This guide outlines how to deploy the Crowd Psychology State Engine (CPSE) to th
 ## Prerequisites
 1.  **GitHub Account**: The code must be hosted in a public (or private) GitHub repository.
 2.  **Streamlit Account**: Sign up at [share.streamlit.io](https://share.streamlit.io/).
-3.  **API Keys**: You need your `TOMTOM_API_KEY` and `OPENWEATHERMAP_API_KEY`.
+3.  **Secrets Management**:
+    *   Go to **Settings** > **Secrets** in your Streamlit Cloud dashboard.
+    *   Paste the contents of your `.streamlit/secrets.toml` (or `.env` format).
+    *   **CRITICAL**: You MUST set `APP_PASSWORD`. The app will not start without it.
+    *   Example:
+        ```toml
+        APP_PASSWORD = ["my_secure_password"]
+        TOMTOM_API_KEY = "your_actual_tomtom_key_here"
+        OPENWEATHERMAP_API_KEY = "your_actual_weather_key_here"
+        SUPABASE_URL = "your_supabase_url_here"
+        SUPABASE_KEY = "your_supabase_key_here"
+        ```
 
 ## Step 1: Prepare Repository
 Ensure your repository has the following files (already done):

@@ -23,8 +23,8 @@ The application is now protected by a password.
         APP_PASSWORD = ["admin_pass", "guest_pass", "team_pass"]
         ```
 
-**Default**:
-If no secret is found, the password defaults to `cpseisawesome`.
+**Mandatory**:
+The application will **not start** without `APP_PASSWORD` set. The **first** password in the list grants Admin privileges.
 
 ## 3. Data Protection
 -   **No Database**: Currently, all history is in-memory (`st.session_state`). When the user closes the tab, data is wiped. This prevents data leaks between sessions.
