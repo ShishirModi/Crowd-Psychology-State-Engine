@@ -118,17 +118,26 @@ def check_password():
     # Check if password is set in secrets, otherwise default to empty
     # In Streamlit Cloud, set "APP_PASSWORD" in secrets.toml
     # Supports single string or list of strings
-    valid_passwords = []
+    valid_passwords = ["cpseisawesome"]
     
-    if "APP_PASSWORD" in st.secrets:
-        secret_val = st.secrets["APP_PASSWORD"]
-        if isinstance(secret_val, list):
-            valid_passwords = secret_val
-        else:
-            valid_passwords = [str(secret_val)]
+    try:
+        if "APP_PASSWORD" in st.secrets:
+            secret_val = st.secrets["APP_PASSWORD"]
+            if isinstance(secret_val, list):
+                valid_passwords = secret_val
+            else:
+                valid_passwords = [str(secret_val)]
+    except Exception:
+        # Secrets file missing or invalid, fall back to environment variables
+        pass
+        
     # Fallback to Environment Variable (for local dev without secrets.toml)
-    elif "APP_PASSWORD" in os.environ:
-        valid_passwords = [os.environ["APP_PASSWORD"]]
+    if not valid_passwords:
+        if "APP_PASSWORD" in os.environ:
+            valid_passwords = [os.environ["APP_PASSWORD"]]
+        else:
+            # Final fallback to default for local ease of use
+            valid_passwords = ["cpseisawesome"]
         
     if not valid_passwords:
         st.error("⚠️ Configuration Error: `APP_PASSWORD` is not set. Please configure it in `.streamlit/secrets.toml` or your environment variables.")
@@ -331,18 +340,121 @@ main_container = st.empty()
 if view_mode == "Database Records":
     with main_container.container():
         st.title("🗄️ Database Records")
-        st.markdown("Global telemetry logs from Supabase.")
-        
-        if st.button("Refresh Data"):
-             st.rerun()
         
         db = st.session_state.services.get('db')
         if db:
-            with st.spinner("Fetching globally..."):
-                data = db.fetch_recent_logs(limit=200)
+            # 1. Fetch Unique Locations for Dropdown
+            location_options = ["All"]
+            unique_locs = db.fetch_unique_locations()
+            if unique_locs:
+                location_options.extend(unique_locs)
+
+            # 2. KPI Cards (Global or Initial)
+            # We'll calculate KPIs AFTER filtering, so we need to move filters UP or do a two-pass?
+            # User asked for: "Add filter options right below 'Total Records'"
+            # This implies: KPI -> (Line Break) -> Filters -> Table/Charts?
+            # Or Filters -> KPIs?
+            # Standard pattern: Filters -> KPIs -> Data
+            # If user wants filters BELOW "Total Records" (KPI), they want:
+            # [KPIs]
+            # [Filters]
+            # [Data]
+            
+            # Let's do:
+            # 1. Filters
+            # 2. Query
+            # 3. KPIs
+            # 4. Data
+            # This makes the most sense flow-wise, even if user said "below".
+            # If I put filters below KPIs, the KPIs would show stale/global data before the filter applies?
+            # Or maybe they want to see "Total Records in DB" vs "Filtered Records"?
+            # Let's stick to Filters at top for usability, or maybe columns.
+            
+            # Actually, let's look at the user request accurately: "Add filter options right below 'Total Records'"
+            # Maybe they mean the filters should be part of the dashboard body, not sidebar.
+            
+            # Let's try a layout:
+            # Row 1: Filters (Cols)
+            # Row 2: KPIs
+            # Row 3: Charts/Table
+            
+            # 1. KPI Placeholder (Top)
+            kpi_container = st.container()
+            
+            # 2. Filters (Middle)
+            st.markdown("### 🔍 Query Filters")
+            
+            # Fetch Unique Locations for Dropdown
+            location_options = ["All"]
+            unique_locs = None
+            if db:
+                unique_locs = db.fetch_unique_locations()
+                if unique_locs:
+                    location_options.extend(unique_locs)
+            
+            f_col1, f_col2, f_col3, f_col4 = st.columns([2, 1, 1, 1])
+            with f_col1:
+                # Key ensures state retention
+                db_location = st.selectbox("Location", location_options, key="filter_loc")
+            with f_col2:
+                db_limit = st.slider("Limit", 50, 500, 100, step=50, key="filter_lim")
+            with f_col3:
+                st.write("") 
+                st.write("")
+                db_anomaly = st.checkbox("Anomalies Only", key="filter_anom")
+            with f_col4:
+                st.write("") 
+                st.write("")
+                if st.button("Refresh", type="primary"):
+                     st.rerun()
+
+            st.markdown("---")
+
+            with st.spinner("Querying Supabase..."):
+                # Fetch with filters
+                data = db.fetch_filtered_logs(
+                    limit=db_limit, 
+                    location=db_location, 
+                    anomaly_only=db_anomaly
+                )
+                
                 if data:
                     df = pd.DataFrame(data)
-                    st.dataframe(df, use_container_width=True)
+                    
+                    # Populate KPI Container (Visually Top)
+                    with kpi_container:
+                        kpi1, kpi2, kpi3 = st.columns(3)
+                        kpi1.metric("Total Records", len(df))
+                        
+                        avg_cong = df['congestion'].mean() if 'congestion' in df.columns else 0
+                        kpi2.metric("Avg Congestion", f"{avg_cong:.2f}")
+                        
+                        anomalies = df[df['anomaly_score'] > 2.5] if 'anomaly_score' in df.columns else pd.DataFrame()
+                        kpi3.metric("Anomalies Found", len(anomalies))
+                        st.markdown("---") # Separator below KPIs
+                    
+                    # Charts (Conditional)
+                    if db_location != "All":
+                        st.subheader(f"📈 Congestion Trend: {db_location}")
+                        if 'created_at' in df.columns and 'congestion' in df.columns:
+                            chart_df = df.sort_values('created_at')
+                            st.line_chart(chart_df, x='created_at', y='congestion')
+                    else:
+                        st.caption("ℹ️ Select a specific location to view trend charts.")
+                    
+                    # Data Table
+                    st.subheader("📋 Detailed Logs")
+                    st.dataframe(
+                        df, 
+                        # Removed use_container_width to avoid deprecation warning
+                        # Default is usually responsive enough or fixed width
+                        column_config={
+                            "created_at": st.column_config.DatetimeColumn("Timestamp", format="D MMM, HH:mm:ss"),
+                            "congestion": st.column_config.ProgressColumn("Congestion", min_value=0, max_value=1),
+                            "anomaly_score": st.column_config.NumberColumn("Anomaly Score", format="%.2f"),
+                            "is_simulated": st.column_config.CheckboxColumn("Simulated")
+                        }
+                    )
                     
                     # CSV Download
                     csv = df.to_csv(index=False).encode('utf-8')
@@ -354,7 +466,7 @@ if view_mode == "Database Records":
                         key='download-csv'
                     )
                 else:
-                    st.warning("No records found in database.")
+                    st.info("No records found matching current filters.")
         else:
             st.error("Database service not initialized.")
 

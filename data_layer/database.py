@@ -92,19 +92,53 @@ class SupabaseManager:
 
     def fetch_recent_logs(self, limit=100):
         """
-        Fetches global recent logs (Admin usage).
+        Fetches global recent logs (Legacy Admin usage).
+        """
+        return self.fetch_filtered_logs(limit=limit)
+
+    def fetch_filtered_logs(self, limit=100, location=None, anomaly_only=False):
+        """
+        Fetches logs with optional filtering.
         """
         if not self.client:
             return []
         try:
-            response = self.client.table("crowd_telemetry")\
-                .select("*")\
-                .order("created_at", desc=True)\
-                .limit(limit)\
-                .execute()
+            # Start query builder
+            query = self.client.table("crowd_telemetry").select("*").order("created_at", desc=True)
+            
+            # Apply Filters
+            if location and location != "All":
+                query = query.eq("location_name", location)
+                
+            if anomaly_only:
+                # Fetch records with anomaly_score > 2.5 (Threshold from classifier)
+                query = query.gt("anomaly_score", 2.5)
+            
+            # Apply specific limit
+            query = query.limit(limit)
+            
+            response = query.execute()
             return response.data
         except Exception as e:
-            print(f"ERROR: Supabase Admin Fetch Failed: {e}")
+            print(f"ERROR: Supabase Filter Fetch Failed: {e}")
+            return []
+
+    def fetch_unique_locations(self):
+        """
+        Fetches a list of unique location names from the database.
+        """
+        if not self.client:
+            return []
+        try:
+            # Fallback for now: fetch distinct names using a workaround or just last 500 records
+            response = self.client.table("crowd_telemetry").select("location_name").order("created_at", desc=True).limit(500).execute()
+            
+            if response.data:
+                locations = sorted(list(set(row['location_name'] for row in response.data)))
+                return locations
+            return []
+        except Exception as e:
+            print(f"ERROR: Supabase Location Fetch Failed: {e}")
             return []
 
 # Factory
