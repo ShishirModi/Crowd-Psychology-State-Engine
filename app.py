@@ -273,13 +273,10 @@ with st.sidebar:
         weather_risk_live = None
         weather_cond = "Unknown"
         
-        # Check if API Key available without exposing it
-        
         if weather_provider.api_key:
              use_live_weather = st.checkbox("Use Live Weather (OpenWeatherMap)", value=True)
         else:
              st.warning("Set OPENWEATHERMAP_API_KEY to enable live weather.")
-             # Fallback to verify if it's in os.environ but maybe empty
              if "OPENWEATHERMAP_API_KEY" in os.environ:
                  st.error("Key found in env but might be empty.")
         
@@ -296,7 +293,6 @@ with st.sidebar:
             weather_map = {"Clear": 0.0, "Rain": 0.5, "Storm": 1.0}
             env_weather_val = weather_map[env_weather]
         else:
-             # Fetch now
              loc = st.session_state.location
              w_risk, w_cond, _ = weather_provider.fetch_weather_risk(loc['lat'], loc['lon'])
              if w_risk is not None:
@@ -327,14 +323,12 @@ with st.sidebar:
 # --- VIEW CONTROLLER ---
 view_mode = "Live Monitor"
 
-# Only show toggle if Admin
 if st.session_state.get("is_admin", False):
     st.sidebar.markdown("---")
     st.sidebar.subheader("🛡️ Admin Console")
     view_mode = st.sidebar.radio("View Mode", ["Live Monitor", "Database Records"])
 
 # --- MAIN CONTENT ---
-# Use a single container for the main loop to prevent "ghosting" artifacts
 main_container = st.empty()
 
 if view_mode == "Database Records":
@@ -456,7 +450,6 @@ if view_mode == "Database Records":
                         }
                     )
                     
-                    # CSV Download
                     csv = df.to_csv(index=False).encode('utf-8')
                     st.download_button(
                         "Download CSV",
@@ -476,13 +469,11 @@ else:
         st.title("Crowd Psychology State Engine")
         st.markdown("Real-time crowd dynamics classification and intervention system.")
         
-        # Ensure provider has current location
         loc = st.session_state.location
         signal_provider.set_location(loc['lat'], loc['lon'], loc.get('name', 'Unknown'))
         
         if not st.session_state.is_running:
             st.info("Analysis stopped. Click 'Start Analysis' in the sidebar to begin monitoring.")
-            # Initialize placeholder values for UI when stopped
             congestion = 0.0
             current_speed = 0.0
             gradient = 0.0
@@ -498,34 +489,25 @@ else:
                 congestion = telemetry['congestion']
                 current_speed = telemetry['current_speed']
                 
-                # Update metrics (pass speed too)
                 metrics = st.session_state.metrics
                 metrics.update(congestion, current_speed)
                 
-                # Unpack tuple: (gradient, quality)
                 gradient, gradient_quality = metrics.compute_compression_gradient()
                 velocity_var = metrics.compute_velocity_variance()
 
-                # --- Phase 2: Vectorization & Anomaly ---
-                # Access session state instances
                 vectorizer = st.session_state.vectorizer
                 anomaly_detector = st.session_state.anomaly_detector
                 
-                # Check for simulation flag
                 is_simulated = telemetry.get("is_simulated", False)
                 if is_simulated:
                     st.toast("⚠️ Using Simulated Data", icon="⚠️")
             
-                # Create vectors (incorporating environment from sidebar)
                 crowd_vector = vectorizer.create_state_vector(congestion, velocity_var, gradient)
                 
-                # OPTIONAL: usage of env vector in future logic
                 env_vector = vectorizer.create_environmental_vector(env_width, env_weather_val, env_event_val)
                 
-                # Detect Anomaly
                 is_anomaly, anomaly_score = anomaly_detector.update_and_detect(crowd_vector)
                 
-                # Classify with Anomaly Awareness
                 history_len = len(metrics.congestion_history)
                 state, confidence = classifier.classify(
                     gradient, 
@@ -536,10 +518,8 @@ else:
                     gradient_quality=gradient_quality
                 )
                 
-                # Local Time
                 local_time = get_local_time(loc['lat'], loc['lon'])
                 
-                # Store History (In-Memory for UI responsiveness)
                 telemetry_record = {
                     "time": local_time,
                     "congestion": congestion,

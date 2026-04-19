@@ -66,7 +66,7 @@ class TomTomSignal:
                 'key': self.api_key,
                 'point': point,
                 'unit': 'KMPH',
-                'cb': int(time.time()) # Cache buster
+                'cb': int(time.time())
             }
             
             print(f"DEBUG: Requesting TomTom API for {point}... (TS: {params['cb']})")
