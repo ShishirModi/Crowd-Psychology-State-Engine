@@ -500,11 +500,11 @@ main_container = st.empty()
 if view_mode == "Database Records":
     with main_container.container():
         st.markdown("## 🗄️ Historical Telemetry Records")
-        st.caption("Query and analyze persisted crowd telemetry from Supabase.")
+        st.caption("Query and analyze persisted crowd telemetry from the local SQLite database.")
 
         db = st.session_state.services.get("db")
         if not db:
-            st.error("Database service not initialized. Check Supabase credentials.")
+            st.error("Database service not initialized.")
             st.stop()
 
         location_options = ["All"]
@@ -531,7 +531,7 @@ if view_mode == "Database Records":
 
         st.markdown("---")
 
-        with st.spinner("Querying Supabase..."):
+        with st.spinner("Querying local database..."):
             data = db.fetch_filtered_logs(limit=db_limit, location=db_location, anomaly_only=db_anomaly)
 
             if not data:

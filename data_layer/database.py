@@ -1,146 +1,180 @@
+import sqlite3
 import os
-from supabase import create_client, Client
-from utils.config_loader import get_config
-import streamlit as st
 from datetime import datetime
 
-class SupabaseManager:
+# ---------------------------------------------------------------------------
+# DB path: stored under ~/.cpse/telemetry.db
+#
+# The workspace folder (mnt/) is a FUSE mount of the user's local filesystem.
+# Most FUSE drivers don't support the fcntl file-locking that SQLite requires,
+# so we store the DB in the session home directory instead — a real filesystem
+# that supports all SQLite operations.  Data persists across Streamlit restarts.
+# ---------------------------------------------------------------------------
+DB_PATH = os.path.join(os.path.expanduser("~"), ".cpse", "telemetry.db")
+
+
+class LocalDatabaseManager:
     """
-    Singleton-like wrapper for Supabase client.
-    Handles connection and data insertion.
+    SQLite-backed persistence layer.
+
+    Drop-in replacement for the old SupabaseManager — identical public
+    interface so the rest of the codebase (app.py, main.py) requires no
+    changes to how the DB is called.
+
+    The database file is created automatically on first use.
     """
-    def __init__(self):
-        # Prefer st.secrets for Cloud, fallback to os.getenv for local
-        self.url = None
-        self.key = None
-        
-        # Try loading from Streamlit secrets (might fail if no secrets.toml found)
-        try:
-            if "SUPABASE_URL" in st.secrets:
-                self.url = st.secrets["SUPABASE_URL"]
-            if "SUPABASE_KEY" in st.secrets:
-                self.key = st.secrets["SUPABASE_KEY"]
-        except Exception:
-            # Secrets Not Found or other error, ignore and fall back to env
-            pass
-            
-        if not self.url:
-            self.url = os.getenv("SUPABASE_URL")
-        if not self.key:
-            self.key = os.getenv("SUPABASE_KEY")
-        self.client: Client = None
-        
-        if self.url and self.key:
-            try:
-                self.client = create_client(self.url, self.key)
-                print("DEBUG: Supabase client initialized.")
-            except Exception as e:
-                print(f"ERROR: Failed to init Supabase: {e}")
-        else:
-            print("WARNING: Supabase credentials missing.")
+
+    def __init__(self, db_path: str = DB_PATH):
+        self.db_path = db_path
+        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        self._init_schema()
+        print(f"DEBUG: SQLite database ready → {self.db_path}")
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _get_conn(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row          # rows behave like dicts
+        return conn
+
+    def _init_schema(self):
+        """Create the table and indexes if they don't exist yet."""
+        with self._get_conn() as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS crowd_telemetry (
+                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                    created_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+                    location_name TEXT    NOT NULL,
+                    latitude      REAL    NOT NULL DEFAULT 0,
+                    longitude     REAL    NOT NULL DEFAULT 0,
+                    congestion    REAL    NOT NULL DEFAULT 0,
+                    speed         REAL,
+                    gradient      REAL,
+                    velocity_var  REAL,
+                    anomaly_score REAL,
+                    state         TEXT    NOT NULL DEFAULT 'Unknown',
+                    session_id    TEXT
+                )
+            """)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_location   ON crowd_telemetry(location_name)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_created_at ON crowd_telemetry(created_at)"
+            )
+            conn.commit()
+
+    # ------------------------------------------------------------------
+    # Public interface  (mirrors SupabaseManager exactly)
+    # ------------------------------------------------------------------
 
     def insert_telemetry(self, data: dict):
-        """
-        Inserts a telemetry record into 'crowd_telemetry'.
-        Data dict must match schema.
-        """
-        if not self.client:
-            return None
-            
+        """Insert one telemetry record."""
         try:
-            # Map Python dict keys to DB columns if necessary, 
-            # assuming data dict keys match DB columns for now.
-            # Explicit mapping for safety:
-            payload = {
-                "location_name": data.get("location_name", "Unknown"),
-                "latitude": data.get("lat"),
-                "longitude": data.get("lon"),
-                "congestion": data.get("congestion"),
-                "speed": data.get("speed"),
-                "gradient": data.get("gradient"),
-                "velocity_var": data.get("velocity_var"),
-                "anomaly_score": data.get("anomaly_score"),
-                "state": data.get("state"),
-                "created_at": datetime.utcnow().isoformat()
-            }
-            
-            response = self.client.table("crowd_telemetry").insert(payload).execute()
-            return response
+            with self._get_conn() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO crowd_telemetry
+                        (location_name, latitude, longitude, congestion, speed,
+                         gradient, velocity_var, anomaly_score, state, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        data.get("location_name", "Unknown"),
+                        data.get("lat",           0.0),
+                        data.get("lon",           0.0),
+                        data.get("congestion",    0.0),
+                        data.get("speed",         0.0),
+                        data.get("gradient",      0.0),
+                        data.get("velocity_var",  0.0),
+                        data.get("anomaly_score", 0.0),
+                        data.get("state",         "Unknown"),
+                        datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    ),
+                )
+                conn.commit()
         except Exception as e:
-            print(f"ERROR: Supabase Insert Failed: {e}")
-            return None
+            print(f"ERROR: SQLite insert failed: {e}")
 
-    def fetch_history(self, location_name, limit=50):
-        """
-        Fetches recent history for a location.
-        """
-        if not self.client:
-            return []
-            
+    def fetch_history(self, location_name: str, limit: int = 50) -> list:
+        """Fetch recent records for a specific location (chronological order)."""
         try:
-            response = self.client.table("crowd_telemetry")\
-                .select("*")\
-                .eq("location_name", location_name)\
-                .order("created_at", desc=True)\
-                .limit(limit)\
-                .execute()
-            data = response.data
-            return data[::-1] if data else []
+            with self._get_conn() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT * FROM crowd_telemetry
+                    WHERE  location_name = ?
+                    ORDER  BY created_at DESC
+                    LIMIT  ?
+                    """,
+                    (location_name, limit),
+                ).fetchall()
+                data = [dict(r) for r in rows]
+                return data[::-1]           # flip to chronological
         except Exception as e:
-            print(f"ERROR: Supabase Fetch Failed: {e}")
+            print(f"ERROR: SQLite fetch_history failed: {e}")
             return []
 
-    def fetch_recent_logs(self, limit=100):
-        """
-        Fetches global recent logs (Legacy Admin usage).
-        """
+    def fetch_recent_logs(self, limit: int = 100) -> list:
+        """Fetch the most-recent global logs (no location filter)."""
         return self.fetch_filtered_logs(limit=limit)
 
-    def fetch_filtered_logs(self, limit=100, location=None, anomaly_only=False):
-        """
-        Fetches logs with optional filtering.
-        """
-        if not self.client:
-            return []
+    def fetch_filtered_logs(
+        self,
+        limit: int = 100,
+        location: str = None,
+        anomaly_only: bool = False,
+    ) -> list:
+        """Fetch logs with optional location and anomaly filters."""
         try:
-            # Start query builder
-            query = self.client.table("crowd_telemetry").select("*").order("created_at", desc=True)
-            
-            # Apply Filters
+            conditions = []
+            params: list = []
+
             if location and location != "All":
-                query = query.eq("location_name", location)
-                
+                conditions.append("location_name = ?")
+                params.append(location)
+
             if anomaly_only:
-                # Fetch records with anomaly_score > 2.5 (Threshold from classifier)
-                query = query.gt("anomaly_score", 2.5)
-            
-            # Apply specific limit
-            query = query.limit(limit)
-            
-            response = query.execute()
-            return response.data
+                conditions.append("anomaly_score > 2.5")
+
+            where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+            query = f"""
+                SELECT * FROM crowd_telemetry
+                {where}
+                ORDER BY created_at DESC
+                LIMIT ?
+            """
+            params.append(limit)
+
+            with self._get_conn() as conn:
+                rows = conn.execute(query, params).fetchall()
+                return [dict(r) for r in rows]
         except Exception as e:
-            print(f"ERROR: Supabase Filter Fetch Failed: {e}")
+            print(f"ERROR: SQLite fetch_filtered_logs failed: {e}")
             return []
 
-    def fetch_unique_locations(self):
-        """
-        Fetches a list of unique location names from the database.
-        """
-        if not self.client:
-            return []
+    def fetch_unique_locations(self) -> list:
+        """Return a sorted list of distinct location names."""
         try:
-            # Fallback for now: fetch distinct names using a workaround or just last 500 records
-            response = self.client.table("crowd_telemetry").select("location_name").order("created_at", desc=True).limit(500).execute()
-            
-            if response.data:
-                locations = sorted(list(set(row['location_name'] for row in response.data)))
-                return locations
-            return []
+            with self._get_conn() as conn:
+                rows = conn.execute(
+                    "SELECT DISTINCT location_name FROM crowd_telemetry ORDER BY location_name"
+                ).fetchall()
+                return [r["location_name"] for r in rows]
         except Exception as e:
-            print(f"ERROR: Supabase Location Fetch Failed: {e}")
+            print(f"ERROR: SQLite fetch_unique_locations failed: {e}")
             return []
 
-# Factory
-def get_db_client():
-    return SupabaseManager()
+
+# ---------------------------------------------------------------------------
+# Backwards-compatibility alias (nothing outside this file imports the class
+# by name, but keep it in case tests reference it)
+# ---------------------------------------------------------------------------
+SupabaseManager = LocalDatabaseManager
+
+
+# Factory — used by app.py:  from data_layer.database import get_db_client
+def get_db_client() -> LocalDatabaseManager:
+    return LocalDatabaseManager()

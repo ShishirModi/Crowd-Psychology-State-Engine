@@ -1,37 +1,40 @@
 # CPSE Configuration
 api:
   tomtom:
-    # Set this to true to use env var
+    # Set use_env_key: true and export TOMTOM_API_KEY=<your_key>
+    # The app falls back to simulation automatically if the key is missing.
     use_env_key: true
     env_key_name: "TOMTOM_API_KEY"
     base_url: "https://api.tomtom.com/traffic/services/4/flowSegmentData"
     search_url: "https://api.tomtom.com/search/2/search"
 
   openweathermap:
-    # Set this to true to use env var
+    # Set use_env_key: true and export OPENWEATHERMAP_API_KEY=<your_key>
     use_env_key: true
     env_key_name: "OPENWEATHERMAP_API_KEY"
     base_url: "https://api.openweathermap.org/data/2.5/weather"
 
-  supabase:
-    env_url_name: "SUPABASE_URL"
-    env_key_name: "SUPABASE_KEY"
+# ── Local SQLite database ────────────────────────────────────────────────────
+# No credentials required.  The DB file is created automatically at:
+#   <project_root>/data/telemetry.db
+database:
+  type: "local"           # "local" = SQLite (default) | future: "supabase"
 
 location:
-  # Example: Delhi approx bounding box or point center
+  # Default monitoring point — can be changed interactively in the UI
   name: "Delhi City Center"
   lat: 28.6139
   lon: 77.2090
-  radius: 2000 # meters
+  radius: 2000  # metres
 
 # Classification thresholds
 thresholds:
   compression_gradient:
-    stable: 0.1
+    stable:      0.1
     compressing: 0.5
-    volatile: 0.8
+    volatile:    0.8
   velocity_variance:
-    high: 2.0  # arbitrary unit for now
+    high: 2.0
 
 simulation:
-  enabled: true # Fallback to simulation if API fails or key missing
+  enabled: true  # Automatic fallback when API key is absent or request fails
