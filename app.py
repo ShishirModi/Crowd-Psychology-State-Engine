@@ -36,48 +36,57 @@ load_dotenv()
 # ═══════════════════════════════════════════════════════════════════════════
 st.set_page_config(
     page_title="CPSE | Crowd Psychology State Engine",
-    page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 # ═══════════════════════════════════════════════════════════════════════════
-# ENTERPRISE CSS
+# LIGHT-MODE PROFESSIONAL CSS
 # ═══════════════════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
-/* ── Reset & Base ──────────────────────────────────────────────────── */
+/* ── Fonts & Base ─────────────────────────────────────────────────── */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 html, body, [class*="css"] {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+    background-color: #f8fafc !important;
+    color: #1e293b !important;
 }
 
-/* ── Hide Streamlit branding ──────────────────────────────────────── */
+/* ── Hide Streamlit chrome ────────────────────────────────────────── */
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
 header {visibility: hidden;}
 
-/* ── Sidebar ──────────────────────────────────────────────────────── */
-[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
-    border-right: 1px solid rgba(148, 163, 184, 0.1);
-}
-[data-testid="stSidebar"] .stMarkdown h1,
-[data-testid="stSidebar"] .stMarkdown h2,
-[data-testid="stSidebar"] .stMarkdown h3 {
-    color: #e2e8f0 !important;
+/* ── Main content padding ─────────────────────────────────────────── */
+.main .block-container {
+    padding: 1.5rem 2rem 3rem !important;
+    max-width: 1440px;
 }
 
-/* ── Metric Cards ─────────────────────────────────────────────────── */
+/* ── Sidebar ──────────────────────────────────────────────────────── */
+[data-testid="stSidebar"] {
+    background: #ffffff !important;
+    border-right: 1px solid #e2e8f0 !important;
+}
+[data-testid="stSidebar"] .stMarkdown p,
+[data-testid="stSidebar"] label,
+[data-testid="stSidebar"] .stCaption {
+    color: #475569 !important;
+}
+[data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {
+    color: #1e293b !important;
+}
+
+/* ── Metric values ────────────────────────────────────────────────── */
 [data-testid="stMetricValue"] {
-    color: #f1f5f9 !important;
-    font-size: 28px !important;
+    color: #1e293b !important;
+    font-size: 24px !important;
     font-weight: 700 !important;
-    font-family: 'Inter', monospace !important;
 }
 [data-testid="stMetricLabel"] {
-    color: #94a3b8 !important;
+    color: #64748b !important;
     font-size: 11px !important;
     font-weight: 600 !important;
     text-transform: uppercase;
@@ -87,163 +96,213 @@ header {visibility: hidden;}
     font-size: 12px !important;
 }
 
-/* ── State Banners ────────────────────────────────────────────────── */
+/* ── State Banner ─────────────────────────────────────────────────── */
 .state-banner {
     padding: 20px 28px;
-    border-radius: 10px;
-    color: #ffffff;
+    border-radius: 8px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 24px;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.25);
-    backdrop-filter: blur(8px);
+    margin-bottom: 20px;
+    border: 1px solid transparent;
+    border-left-width: 5px;
+    border-left-style: solid;
 }
 .state-banner .state-label {
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 11px;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 2px;
-    opacity: 0.85;
+    opacity: 0.75;
+    margin-bottom: 4px;
 }
 .state-banner .state-value {
-    font-size: 26px;
+    font-size: 24px;
     font-weight: 800;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
 }
-.state-banner .state-right {
-    text-align: right;
-}
+.state-banner .state-right { text-align: right; }
 .state-banner .confidence-label {
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 1.5px;
-    opacity: 0.7;
+    opacity: 0.65;
+    margin-bottom: 2px;
 }
 .state-banner .confidence-value {
-    font-size: 32px;
+    font-size: 30px;
     font-weight: 800;
 }
+.state-banner .state-summary {
+    font-size: 12px;
+    opacity: 0.7;
+    margin-top: 4px;
+    font-weight: 400;
+}
 
-.banner-stable { background: linear-gradient(135deg, #059669 0%, #047857 100%); }
-.banner-compressing { background: linear-gradient(135deg, #d97706 0%, #b45309 100%); }
-.banner-volatile { background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); }
-.banner-agitated { background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); }
-.banner-fragmenting { background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%); }
+/* pastel state colours */
+.banner-stable      { background:#f0fdf4; border-color:#bbf7d0; border-left-color:#22c55e; color:#15803d; }
+.banner-compressing { background:#fffbeb; border-color:#fde68a; border-left-color:#f59e0b; color:#b45309; }
+.banner-volatile    { background:#fef2f2; border-color:#fecaca; border-left-color:#f87171; color:#b91c1c; }
+.banner-agitated    { background:#faf5ff; border-color:#ddd6fe; border-left-color:#a78bfa; color:#6d28d9; }
+.banner-fragmenting { background:#f0f9ff; border-color:#bae6fd; border-left-color:#38bdf8; color:#0369a1; }
 
 /* ── Risk Score Bar ───────────────────────────────────────────────── */
 .risk-bar-container {
-    background: #1e293b;
+    background: #ffffff;
     border-radius: 8px;
     padding: 16px 20px;
     margin-bottom: 20px;
-    border: 1px solid #334155;
+    border: 1px solid #e2e8f0;
 }
 .risk-bar-label {
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 1.5px;
-    color: #94a3b8;
+    color: #64748b;
     margin-bottom: 8px;
 }
 .risk-bar-outer {
-    background: #0f172a;
+    background: #f1f5f9;
     border-radius: 6px;
-    height: 14px;
+    height: 12px;
     overflow: hidden;
-    position: relative;
 }
 .risk-bar-fill {
     height: 100%;
     border-radius: 6px;
-    transition: width 0.6s ease;
+    transition: width 0.5s ease;
 }
 .risk-bar-value {
-    font-size: 22px;
-    font-weight: 800;
+    font-size: 20px;
+    font-weight: 700;
     margin-top: 6px;
 }
 
 /* ── Criteria Panels ──────────────────────────────────────────────── */
 .criteria-panel {
-    background: #1e293b;
-    border-radius: 8px;
-    padding: 16px;
+    background: #f8fafc;
+    border-radius: 6px;
+    padding: 12px 14px;
     margin-top: 8px;
-    border-left: 3px solid #475569;
-    font-size: 13px;
+    border-left: 3px solid #cbd5e1;
+    font-size: 12px;
     line-height: 1.6;
-    color: #cbd5e1;
+    color: #374151;
 }
-.criteria-panel.safe { border-left-color: #22c55e; }
-.criteria-panel.watch { border-left-color: #eab308; }
-.criteria-panel.warning { border-left-color: #f97316; }
-.criteria-panel.critical { border-left-color: #ef4444; }
+.criteria-panel.safe     { border-left-color: #86efac; }
+.criteria-panel.watch    { border-left-color: #fde68a; }
+.criteria-panel.warning  { border-left-color: #fdba74; }
+.criteria-panel.critical { border-left-color: #fca5a5; }
 
 .criteria-row {
     display: flex;
     justify-content: space-between;
     padding: 3px 0;
-    border-bottom: 1px solid rgba(71, 85, 105, 0.3);
+    border-bottom: 1px solid rgba(203,213,225,0.5);
 }
 .criteria-row:last-child { border-bottom: none; }
 .criteria-key {
-    color: #94a3b8;
+    color: #64748b;
     font-weight: 500;
-    font-size: 12px;
+    font-size: 11px;
 }
 .criteria-val {
-    color: #e2e8f0;
+    color: #1e293b;
     font-weight: 600;
-    font-size: 12px;
+    font-size: 11px;
     font-family: 'Inter', monospace;
+}
+.criteria-verdict {
+    margin-top: 8px;
+    font-size: 11px;
+    color: #475569;
+    font-style: italic;
 }
 
 /* ── Intervention Cards ───────────────────────────────────────────── */
 .intervention-card {
-    background: #1e293b;
+    background: #ffffff;
     border-radius: 8px;
     padding: 14px 16px;
     margin-bottom: 10px;
-    border-left: 4px solid #475569;
-    transition: transform 0.15s ease;
+    border: 1px solid #e2e8f0;
+    border-left: 4px solid #cbd5e1;
+    transition: box-shadow 0.15s ease;
 }
 .intervention-card:hover {
-    transform: translateX(4px);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
 }
-.intervention-card.priority-critical { border-left-color: #ef4444; }
-.intervention-card.priority-high { border-left-color: #f97316; }
-.intervention-card.priority-medium { border-left-color: #eab308; }
-.intervention-card.priority-low { border-left-color: #22c55e; }
+.intervention-card.priority-critical { border-left-color: #fca5a5; }
+.intervention-card.priority-high     { border-left-color: #fdba74; }
+.intervention-card.priority-medium   { border-left-color: #fde68a; }
+.intervention-card.priority-low      { border-left-color: #86efac; }
 
 .intervention-action {
-    color: #e2e8f0;
+    color: #1e293b;
     font-size: 13px;
     font-weight: 500;
-    margin-bottom: 4px;
+    margin-bottom: 5px;
 }
 .intervention-meta {
     font-size: 11px;
-    color: #64748b;
+    color: #94a3b8;
 }
-.intervention-meta span {
-    margin-right: 14px;
-}
+.intervention-meta span { margin-right: 14px; }
 
-/* ── Section headers ──────────────────────────────────────────────── */
+/* ── Section Headers ──────────────────────────────────────────────── */
 .section-header {
-    font-size: 14px;
+    font-size: 11px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 2px;
     color: #94a3b8;
-    margin-bottom: 16px;
+    margin-bottom: 14px;
     padding-bottom: 8px;
-    border-bottom: 1px solid #334155;
+    border-bottom: 1px solid #e2e8f0;
 }
 
-/* ── Toast override ───────────────────────────────────────────────── */
+/* ── Dividers ─────────────────────────────────────────────────────── */
+hr { border-color: #e2e8f0 !important; }
+
+/* ── Expanders ────────────────────────────────────────────────────── */
+[data-testid="stExpander"] {
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    background: #ffffff !important;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────── */
+[data-testid="stButton"] button {
+    border-radius: 6px !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
+}
+
+/* ── Responsive column stacking ───────────────────────────────────── */
+@media (max-width: 960px) {
+    [data-testid="column"] {
+        min-width: calc(50% - 0.5rem) !important;
+        flex: 0 0 calc(50% - 0.5rem) !important;
+    }
+}
+@media (max-width: 620px) {
+    [data-testid="column"] {
+        min-width: 100% !important;
+        flex: 0 0 100% !important;
+    }
+    .main .block-container {
+        padding: 1rem 0.75rem !important;
+    }
+    .state-banner {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+}
+
+/* ── Toast ────────────────────────────────────────────────────────── */
 .stToast { font-family: 'Inter', sans-serif !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -307,7 +366,7 @@ def _render_login(callback, error=False):
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.markdown("<br><br>", unsafe_allow_html=True)
-        st.markdown("### 🛡️ CPSE — Secure Access")
+        st.markdown("### CPSE — Secure Access")
         st.text_input("Enter access key", type="password", on_change=callback, key="password")
         if error:
             st.error("Access denied — incorrect key.")
@@ -339,9 +398,9 @@ recommender = st.session_state.services["recommender"]
 # HELPER: Plotly Theme
 # ═══════════════════════════════════════════════════════════════════════════
 PLOTLY_LAYOUT = dict(
-    paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="rgba(15,23,42,0.6)",
-    font=dict(family="Inter, sans-serif", color="#94a3b8", size=11),
+    paper_bgcolor="rgba(255,255,255,0)",
+    plot_bgcolor="rgba(248,250,252,0.9)",
+    font=dict(family="Inter, sans-serif", color="#64748b", size=11),
     margin=dict(l=40, r=20, t=40, b=40),
     legend=dict(
         orientation="h",
@@ -349,35 +408,46 @@ PLOTLY_LAYOUT = dict(
         y=1.02,
         xanchor="right",
         x=1,
-        font=dict(size=10),
+        font=dict(size=10, color="#64748b"),
     ),
     xaxis=dict(
-        gridcolor="rgba(51,65,85,0.4)",
-        zerolinecolor="rgba(51,65,85,0.4)",
+        gridcolor="rgba(226,232,240,0.9)",
+        zerolinecolor="rgba(226,232,240,0.9)",
+        linecolor="#e2e8f0",
     ),
     yaxis=dict(
-        gridcolor="rgba(51,65,85,0.4)",
-        zerolinecolor="rgba(51,65,85,0.4)",
+        gridcolor="rgba(226,232,240,0.9)",
+        zerolinecolor="rgba(226,232,240,0.9)",
+        linecolor="#e2e8f0",
     ),
 )
 
+# Pastel palette — used in the state distribution pie and history charts
 STATE_COLORS = {
-    "Stable": "#22c55e",
-    "Compressing": "#f59e0b",
-    "Volatile": "#ef4444",
-    "Agitated": "#9333ea",
-    "Fragmenting": "#06b6d4",
+    "Stable":      "#86efac",   # pastel green
+    "Compressing": "#fde68a",   # pastel amber
+    "Volatile":    "#fca5a5",   # pastel red
+    "Agitated":    "#c4b5fd",   # pastel violet
+    "Fragmenting": "#bae6fd",   # pastel sky
+}
+
+# Muted chart line colours
+CHART_COLORS = {
+    "congestion":  "#7eb8da",   # steel blue
+    "gradient":    "#c4a35a",   # warm gold
+    "velocity":    "#a89ad4",   # soft purple
+    "anomaly":     "#d47a7a",   # muted rose
 }
 
 
 def risk_bar_color(score):
     if score > 75:
-        return "#ef4444"
+        return "#f87171"    # pastel red
     elif score > 50:
-        return "#f97316"
+        return "#fb923c"    # pastel orange
     elif score > 25:
-        return "#eab308"
-    return "#22c55e"
+        return "#fbbf24"    # pastel amber
+    return "#4ade80"        # pastel green
 
 
 def render_criteria_panel(rating, rows_dict, verdict=""):
@@ -385,20 +455,50 @@ def render_criteria_panel(rating, rows_dict, verdict=""):
     rows_html = ""
     for k, v in rows_dict.items():
         rows_html += f'<div class="criteria-row"><span class="criteria-key">{k}</span><span class="criteria-val">{v}</span></div>'
-    verdict_html = f'<div style="margin-top:8px;font-size:12px;color:#e2e8f0;font-style:italic;">{verdict}</div>' if verdict else ""
+    verdict_html = f'<div class="criteria-verdict">{verdict}</div>' if verdict else ""
     return f'<div class="criteria-panel {rating}">{rows_html}{verdict_html}</div>'
 
+
+# ── Safe defaults for environmental variables ────────────────────────────────
+# These are always overwritten inside the sidebar expander, but defining them
+# here prevents NameErrors if the expander code raises before assignment.
+env_weather_val  = 0.0
+env_width        = 1.0
+env_event        = False
+env_event_val    = 0.0
+use_live_weather = False
+weather_cond     = "Unknown"
+env_weather      = "Clear"
 
 # ═══════════════════════════════════════════════════════════════════════════
 # SIDEBAR
 # ═══════════════════════════════════════════════════════════════════════════
 with st.sidebar:
-    st.markdown("## 🛡️ CPSE Control Center")
+    st.markdown("## CPSE Control Center")
     st.caption("Crowd Psychology State Engine v2.0")
     st.markdown("---")
 
+    # Database connection status badge
+    _db = st.session_state.services.get("db") if "services" in st.session_state else None
+    if _db is not None:
+        if _db.connected:
+            st.markdown(
+                '<div style="background:#f0fdf4;border:1px solid #86efac;border-left:3px solid #22c55e;'
+                'border-radius:6px;padding:8px 12px;font-size:11px;color:#15803d;">'
+                '<b>DB</b> Connected — Neon PostgreSQL</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                '<div style="background:#fef2f2;border:1px solid #fca5a5;border-left:3px solid #f87171;'
+                'border-radius:6px;padding:8px 12px;font-size:11px;color:#b91c1c;">'
+                f'<b>DB</b> {_db.status_label}</div>',
+                unsafe_allow_html=True,
+            )
+    st.markdown("---")
+
     # Location
-    st.markdown('<p class="section-header" style="font-size:12px;font-weight:700;color:#94a3b8;letter-spacing:1.5px;text-transform:uppercase;">📍 MONITORING LOCATION</p>', unsafe_allow_html=True)
+    st.markdown('<p class="section-header">MONITORING LOCATION</p>', unsafe_allow_html=True)
     current_loc_name = st.session_state.location.get("name", "Unknown")
     st.info(f"**{current_loc_name}**")
 
@@ -430,14 +530,14 @@ with st.sidebar:
     st.markdown("---")
 
     # Controls
-    st.markdown('<p style="font-size:12px;font-weight:700;color:#94a3b8;letter-spacing:1.5px;text-transform:uppercase;">⚙️ ANALYSIS CONTROLS</p>', unsafe_allow_html=True)
+    st.markdown('<p class="section-header">ANALYSIS CONTROLS</p>', unsafe_allow_html=True)
 
     if st.session_state.is_running:
-        if st.button("⏹  Stop Analysis", type="primary", use_container_width=True):
+        if st.button("Stop Analysis", type="primary", use_container_width=True):
             st.session_state.is_running = False
             st.rerun()
     else:
-        if st.button("▶  Start Analysis", type="primary", use_container_width=True):
+        if st.button("Start Analysis", type="primary", use_container_width=True):
             st.session_state.is_running = True
             st.rerun()
 
@@ -447,7 +547,7 @@ with st.sidebar:
     st.markdown("---")
 
     # Environment
-    with st.expander("🌍 Environmental Conditions", expanded=False):
+    with st.expander("Environmental Conditions", expanded=False):
         from signals.weather import OpenWeatherMapSignal
 
         weather_provider = OpenWeatherMapSignal()
@@ -488,7 +588,7 @@ with st.sidebar:
 view_mode = "Live Monitor"
 if st.session_state.get("is_admin", False):
     st.sidebar.markdown("---")
-    st.sidebar.markdown('<p style="font-size:12px;font-weight:700;color:#94a3b8;letter-spacing:1.5px;text-transform:uppercase;">🔐 ADMIN CONSOLE</p>', unsafe_allow_html=True)
+    st.sidebar.markdown('<p class="section-header">ADMIN CONSOLE</p>', unsafe_allow_html=True)
     view_mode = st.sidebar.radio("View Mode", ["Live Monitor", "Database Records"])
 
 
@@ -499,26 +599,31 @@ main_container = st.empty()
 
 if view_mode == "Database Records":
     with main_container.container():
-        st.markdown("## 🗄️ Historical Telemetry Records")
-        st.caption("Query and analyze persisted crowd telemetry from the local SQLite database.")
+        st.markdown("## Historical Telemetry Records")
+        st.caption("Query and analyze persisted crowd telemetry from Neon PostgreSQL.")
 
+        # ── Bug 1 fix: check .connected, not truthiness of the object ────────
         db = st.session_state.services.get("db")
-        if not db:
-            st.error("Database service not initialized.")
+        if db is None:
+            st.error("Database service not initialised.")
             st.stop()
 
-        location_options = ["All"]
-        unique_locs = db.fetch_unique_locations()
-        if unique_locs:
-            location_options.extend(unique_locs)
+        if not db.connected:
+            st.warning(
+                f"Database not connected — {db.status_label}. "
+                "Set the `NEON_PASS` environment variable and restart the app."
+            )
+            st.stop()
 
-        # Filters
+        # ── Filters ───────────────────────────────────────────────────────────
+        location_options = ["All"] + db.fetch_unique_locations()
+
         st.markdown('<p class="section-header">QUERY FILTERS</p>', unsafe_allow_html=True)
         f1, f2, f3, f4 = st.columns([2, 1, 1, 1])
         with f1:
             db_location = st.selectbox("Location", location_options, key="filter_loc")
         with f2:
-            db_limit = st.slider("Limit", 50, 500, 100, step=50, key="filter_lim")
+            db_limit = st.slider("Limit", 10, 500, 100, step=10, key="filter_lim")
         with f3:
             st.write("")
             st.write("")
@@ -526,70 +631,130 @@ if view_mode == "Database Records":
         with f4:
             st.write("")
             st.write("")
-            if st.button("Refresh Data", type="primary"):
+            if st.button("Refresh", type="primary"):
                 st.rerun()
 
         st.markdown("---")
 
-        with st.spinner("Querying local database..."):
-            data = db.fetch_filtered_logs(limit=db_limit, location=db_location, anomaly_only=db_anomaly)
-
-            if not data:
-                st.info("No records found matching current filters.")
-                st.stop()
-
-            df = pd.DataFrame(data)
-
-            # KPIs
-            k1, k2, k3, k4 = st.columns(4)
-            k1.metric("Total Records", f"{len(df):,}")
-            avg_cong = df["congestion"].mean() if "congestion" in df.columns else 0
-            k2.metric("Avg Congestion", f"{avg_cong:.3f}")
-            anomalies = df[df["anomaly_score"] > 2.5] if "anomaly_score" in df.columns else pd.DataFrame()
-            k3.metric("Anomalies Detected", f"{len(anomalies):,}")
-            if "state" in df.columns:
-                mode_state = df["state"].mode().iloc[0] if len(df) > 0 else "N/A"
-                k4.metric("Dominant State", mode_state)
-
-            st.markdown("---")
-
-            # Chart
-            if db_location != "All" and "created_at" in df.columns and "congestion" in df.columns:
-                st.markdown(f'<p class="section-header">CONGESTION TREND — {db_location.upper()}</p>', unsafe_allow_html=True)
-                chart_df = df.sort_values("created_at")
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(
-                    x=chart_df["created_at"], y=chart_df["congestion"],
-                    mode="lines+markers", name="Congestion",
-                    line=dict(color="#3b82f6", width=2),
-                    marker=dict(size=4),
-                    fill="tozeroy", fillcolor="rgba(59,130,246,0.1)",
-                ))
-                if "gradient" in chart_df.columns:
-                    fig.add_trace(go.Scatter(
-                        x=chart_df["created_at"], y=chart_df["gradient"],
-                        mode="lines", name="Gradient",
-                        line=dict(color="#f59e0b", width=1.5, dash="dot"),
-                    ))
-                fig.update_layout(**PLOTLY_LAYOUT, height=350, yaxis_range=[0, 1.1])
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.caption("Select a specific location to view trend charts.")
-
-            # Table
-            st.markdown('<p class="section-header">DETAILED LOGS</p>', unsafe_allow_html=True)
-            st.dataframe(
-                df,
-                column_config={
-                    "created_at": st.column_config.DatetimeColumn("Timestamp", format="D MMM, HH:mm:ss"),
-                    "congestion": st.column_config.ProgressColumn("Congestion", min_value=0, max_value=1),
-                    "anomaly_score": st.column_config.NumberColumn("Anomaly Score", format="%.2f"),
-                },
-                use_container_width=True,
+        # ── Bug 2 fix: fetch OUTSIDE spinner so st.stop() never runs inside it ─
+        with st.spinner("Querying Neon DB..."):
+            data = db.fetch_filtered_logs(
+                limit=db_limit,
+                location=db_location,
+                anomaly_only=db_anomaly,
             )
 
-            csv = df.to_csv(index=False).encode("utf-8")
-            st.download_button("Download CSV Export", csv, "cpse_telemetry.csv", "text/csv", key="dl-csv")
+        # Empty-state guard — AFTER the spinner has already closed cleanly
+        if not data:
+            st.info("No records found. Run an analysis session first, then return here.")
+            st.stop()
+
+        df = pd.DataFrame(data)
+
+        # Normalise created_at to naive UTC for consistent display
+        if "created_at" in df.columns and pd.api.types.is_datetime64_any_dtype(df["created_at"]):
+            df["created_at"] = pd.to_datetime(df["created_at"], utc=True).dt.tz_localize(None)
+
+        # ── KPI row ───────────────────────────────────────────────────────────
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("Total Records", f"{len(df):,}")
+
+        avg_cong = df["congestion"].mean() if "congestion" in df.columns else 0
+        k2.metric("Avg Congestion", f"{avg_cong:.3f}")
+
+        if "anomaly_score" in df.columns:
+            n_anom = int((df["anomaly_score"] > 2.5).sum())
+        else:
+            n_anom = 0
+        k3.metric("Anomalies Detected", f"{n_anom:,}")
+
+        # Bug 3 fix: guard against all-NaN state column before .mode()
+        if "state" in df.columns:
+            clean_states = df["state"].dropna()
+            mode_state = clean_states.mode().iloc[0] if len(clean_states) > 0 else "N/A"
+        else:
+            mode_state = "N/A"
+        k4.metric("Dominant State", mode_state)
+
+        st.markdown("---")
+
+        # ── Trend chart (only when a single location is selected) ─────────────
+        if db_location != "All" and "created_at" in df.columns and "congestion" in df.columns:
+            st.markdown(
+                f'<p class="section-header">CONGESTION TREND — {db_location.upper()}</p>',
+                unsafe_allow_html=True,
+            )
+            chart_df = df.sort_values("created_at")
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=chart_df["created_at"], y=chart_df["congestion"],
+                mode="lines+markers", name="Congestion",
+                line=dict(color=CHART_COLORS["congestion"], width=2),
+                marker=dict(size=4),
+                fill="tozeroy", fillcolor="rgba(126,184,218,0.12)",
+            ))
+            if "gradient" in chart_df.columns:
+                fig.add_trace(go.Scatter(
+                    x=chart_df["created_at"], y=chart_df["gradient"],
+                    mode="lines", name="Gradient",
+                    line=dict(color=CHART_COLORS["gradient"], width=1.5, dash="dot"),
+                ))
+            if "anomaly_score" in chart_df.columns:
+                fig.add_trace(go.Scatter(
+                    x=chart_df["created_at"], y=chart_df["anomaly_score"],
+                    mode="lines", name="Anomaly Z",
+                    line=dict(color=CHART_COLORS["anomaly"], width=1.2, dash="dash"),
+                ))
+                fig.add_hline(
+                    y=2.5, line_dash="dot",
+                    line_color="rgba(212,122,122,0.5)",
+                    annotation_text="Z=2.5", annotation_font_color="#d47a7a",
+                )
+            fig.update_layout(**PLOTLY_LAYOUT, height=360, yaxis_range=[0, 1.1])
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.caption("Select a specific location to view the trend chart.")
+
+        # ── Data table ────────────────────────────────────────────────────────
+        st.markdown('<p class="section-header">DETAILED LOGS</p>', unsafe_allow_html=True)
+
+        # Friendly column rename for display
+        display_df = df.rename(columns={
+            "created_at":    "Timestamp",
+            "location_name": "Location",
+            "latitude":      "Lat",
+            "longitude":     "Lon",
+            "congestion":    "Congestion",
+            "speed":         "Speed (km/h)",
+            "gradient":      "Gradient",
+            "velocity_var":  "Velocity CV",
+            "anomaly_score": "Anomaly Z",
+            "risk_score":    "Risk Score",
+            "state":         "State",
+        })
+        # Drop internal columns not useful for the operator
+        display_df = display_df.drop(columns=[c for c in ["id", "session_id", "Lat", "Lon"] if c in display_df.columns])
+
+        col_cfg: dict = {}
+        if "Timestamp"    in display_df.columns:
+            col_cfg["Timestamp"]    = st.column_config.DatetimeColumn("Timestamp", format="D MMM YYYY, HH:mm:ss")
+        if "Congestion"   in display_df.columns:
+            col_cfg["Congestion"]   = st.column_config.ProgressColumn("Congestion",   min_value=0, max_value=1, format="%.3f")
+        if "Anomaly Z"    in display_df.columns:
+            col_cfg["Anomaly Z"]    = st.column_config.NumberColumn("Anomaly Z",      format="%.2f")
+        if "Risk Score"   in display_df.columns:
+            col_cfg["Risk Score"]   = st.column_config.ProgressColumn("Risk Score",   min_value=0, max_value=100, format="%.0f")
+        if "Speed (km/h)" in display_df.columns:
+            col_cfg["Speed (km/h)"] = st.column_config.NumberColumn("Speed (km/h)",   format="%.1f")
+
+        st.dataframe(display_df, column_config=col_cfg, use_container_width=True)
+
+        csv = df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "Download CSV Export", csv,
+            "cpse_telemetry.csv", "text/csv",
+            key="dl-csv",
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -601,11 +766,11 @@ else:
         # ── Header ────────────────────────────────────────────────────────
         h1, h2 = st.columns([3, 1])
         with h1:
-            st.markdown("## 🛡️ Crowd Psychology State Engine")
+            st.markdown("## Crowd Psychology State Engine")
             st.caption("Real-time crowd dynamics classification, risk analysis & intervention planning")
         with h2:
             loc = st.session_state.location
-            st.markdown(f"**📍 {loc.get('name', 'Unknown')}**")
+            st.markdown(f"**{loc.get('name', 'Unknown')}**")
             st.caption(f"{loc.get('lat', 0):.4f}°N, {loc.get('lon', 0):.4f}°E")
 
         signal_provider.set_location(loc["lat"], loc["lon"], loc.get("name", "Unknown"))
@@ -640,7 +805,7 @@ else:
                 is_simulated = telemetry.get("is_simulated", False)
 
                 if is_simulated:
-                    st.toast("Using simulated data — API keys not configured", icon="⚠️")
+                    st.toast("Using simulated data — API keys not configured")
 
                 crowd_vector = vectorizer.create_state_vector(congestion, velocity_var, gradient)
                 env_vector = vectorizer.create_environmental_vector(env_width, env_weather_val, env_event_val)
@@ -804,20 +969,20 @@ else:
         # ── 4. Confidence Breakdown ───────────────────────────────────────
         conf_bd = breakdown.get("confidence", {})
         if conf_bd:
-            with st.expander("📊 Confidence Score Breakdown", expanded=False):
+            with st.expander("Confidence Score Breakdown", expanded=False):
                 c1, c2 = st.columns(2)
                 with c1:
                     st.markdown("**Penalties Applied**")
                     if conf_bd.get("penalties"):
                         for p in conf_bd["penalties"]:
-                            st.markdown(f"- 🔻 {p}")
+                            st.markdown(f"- {p}")
                     else:
                         st.markdown("- None")
                 with c2:
                     st.markdown("**Bonuses Applied**")
                     if conf_bd.get("bonuses"):
                         for b in conf_bd["bonuses"]:
-                            st.markdown(f"- 🔺 {b}")
+                            st.markdown(f"- {b}")
                     else:
                         st.markdown("- None")
                 st.caption(conf_bd.get("verdict", ""))
@@ -890,39 +1055,39 @@ else:
                     x=df["time"], y=df["congestion"],
                     name="Congestion",
                     mode="lines+markers",
-                    line=dict(color="#3b82f6", width=2.5),
+                    line=dict(color=CHART_COLORS["congestion"], width=2),
                     marker=dict(size=4),
                     fill="tozeroy",
-                    fillcolor="rgba(59,130,246,0.08)",
+                    fillcolor="rgba(126,184,218,0.12)",
                 ), row=1, col=1)
 
                 fig.add_trace(go.Scatter(
                     x=df["time"], y=df["gradient"],
                     name="Gradient",
                     mode="lines",
-                    line=dict(color="#f59e0b", width=2, dash="dot"),
+                    line=dict(color=CHART_COLORS["gradient"], width=1.8, dash="dot"),
                 ), row=1, col=1)
 
                 fig.add_trace(go.Scatter(
                     x=df["time"], y=df["velocity_var"],
                     name="Velocity Var (CV)",
                     mode="lines+markers",
-                    line=dict(color="#8b5cf6", width=2),
+                    line=dict(color=CHART_COLORS["velocity"], width=1.8),
                     marker=dict(size=3),
                     fill="tozeroy",
-                    fillcolor="rgba(139,92,246,0.08)",
+                    fillcolor="rgba(168,154,212,0.10)",
                 ), row=2, col=1)
 
                 fig.add_trace(go.Scatter(
                     x=df["time"], y=df["anomaly_score"],
                     name="Anomaly Z-Score",
                     mode="lines",
-                    line=dict(color="#ef4444", width=1.5, dash="dash"),
+                    line=dict(color=CHART_COLORS["anomaly"], width=1.5, dash="dash"),
                 ), row=2, col=1)
 
                 # Anomaly threshold line
-                fig.add_hline(y=2.5, line_dash="dot", line_color="rgba(239,68,68,0.4)",
-                              annotation_text="Z=2.5", annotation_font_color="#ef4444",
+                fig.add_hline(y=2.5, line_dash="dot", line_color="rgba(212,122,122,0.5)",
+                              annotation_text="Z=2.5", annotation_font_color="#d47a7a",
                               row=2, col=1)
 
                 fig.update_layout(
@@ -930,9 +1095,9 @@ else:
                     height=480,
                     showlegend=True,
                 )
-                fig.update_yaxes(range=[0, 1.15], row=1, col=1, gridcolor="rgba(51,65,85,0.3)")
-                fig.update_yaxes(gridcolor="rgba(51,65,85,0.3)", row=2, col=1)
-                fig.update_xaxes(gridcolor="rgba(51,65,85,0.3)")
+                fig.update_yaxes(range=[0, 1.15], row=1, col=1, gridcolor="rgba(226,232,240,0.8)")
+                fig.update_yaxes(gridcolor="rgba(226,232,240,0.8)", row=2, col=1)
+                fig.update_xaxes(gridcolor="rgba(226,232,240,0.8)")
 
                 st.plotly_chart(fig, use_container_width=True)
 
@@ -941,21 +1106,21 @@ else:
                 fig_gauge = go.Figure(go.Indicator(
                     mode="gauge+number+delta",
                     value=risk_score,
-                    title={"text": "Risk Score", "font": {"size": 14, "color": "#94a3b8"}},
-                    number={"font": {"size": 36, "color": "#f1f5f9"}},
+                    title={"text": "Risk Score", "font": {"size": 13, "color": "#64748b"}},
+                    number={"font": {"size": 34, "color": "#1e293b"}},
                     gauge={
-                        "axis": {"range": [0, 100], "tickcolor": "#475569", "tickfont": {"color": "#94a3b8"}},
-                        "bar": {"color": bar_color, "thickness": 0.7},
-                        "bgcolor": "#1e293b",
-                        "bordercolor": "#334155",
+                        "axis": {"range": [0, 100], "tickcolor": "#cbd5e1", "tickfont": {"color": "#94a3b8"}},
+                        "bar": {"color": bar_color, "thickness": 0.65},
+                        "bgcolor": "#f8fafc",
+                        "bordercolor": "#e2e8f0",
                         "steps": [
-                            {"range": [0, 25], "color": "rgba(34,197,94,0.15)"},
-                            {"range": [25, 50], "color": "rgba(234,179,8,0.15)"},
-                            {"range": [50, 75], "color": "rgba(249,115,22,0.15)"},
-                            {"range": [75, 100], "color": "rgba(239,68,68,0.15)"},
+                            {"range": [0,  25], "color": "rgba(134,239,172,0.20)"},
+                            {"range": [25, 50], "color": "rgba(253,230,138,0.20)"},
+                            {"range": [50, 75], "color": "rgba(253,186,116,0.20)"},
+                            {"range": [75,100], "color": "rgba(252,165,165,0.20)"},
                         ],
                         "threshold": {
-                            "line": {"color": "#ef4444", "width": 3},
+                            "line": {"color": "#fca5a5", "width": 3},
                             "thickness": 0.8,
                             "value": 75,
                         },
@@ -964,7 +1129,7 @@ else:
                 fig_gauge.update_layout(
                     paper_bgcolor="rgba(0,0,0,0)",
                     plot_bgcolor="rgba(0,0,0,0)",
-                    font=dict(family="Inter, sans-serif", color="#94a3b8"),
+                    font=dict(family="Inter, sans-serif", color="#64748b"),
                     height=240,
                     margin=dict(l=30, r=30, t=50, b=20),
                 )
@@ -977,19 +1142,19 @@ else:
                     fig_pie = go.Figure(go.Pie(
                         labels=state_counts.index,
                         values=state_counts.values,
-                        marker=dict(colors=colors),
+                        marker=dict(colors=colors, line=dict(color="#ffffff", width=2)),
                         hole=0.55,
                         textinfo="label+percent",
-                        textfont=dict(size=11, color="#e2e8f0"),
+                        textfont=dict(size=11, color="#374151"),
                     ))
                     fig_pie.update_layout(
                         paper_bgcolor="rgba(0,0,0,0)",
                         plot_bgcolor="rgba(0,0,0,0)",
-                        font=dict(family="Inter, sans-serif", color="#94a3b8"),
+                        font=dict(family="Inter, sans-serif", color="#64748b"),
                         height=220,
                         margin=dict(l=10, r=10, t=10, b=10),
                         showlegend=False,
-                        title=dict(text="State Distribution", font=dict(size=12, color="#94a3b8")),
+                        title=dict(text="State Distribution", font=dict(size=12, color="#64748b")),
                     )
                     st.plotly_chart(fig_pie, use_container_width=True)
 
@@ -998,7 +1163,7 @@ else:
 
         # ── 7. Anomaly Feature Breakdown ──────────────────────────────────
         if anomaly_details and anomaly_details.get("per_feature"):
-            with st.expander("🔬 Anomaly Detection — Per-Feature Breakdown", expanded=False):
+            with st.expander("Anomaly Detection — Per-Feature Breakdown", expanded=False):
                 features = anomaly_details["per_feature"]
                 if features:
                     feat_df = pd.DataFrame(features)
@@ -1008,18 +1173,20 @@ else:
                         x=[f["feature"] for f in features],
                         y=[f["z_score"] for f in features],
                         marker_color=[
-                            "#ef4444" if f["is_outlier"] else "#3b82f6" for f in features
+                            "#fca5a5" if f["is_outlier"] else "#a0c4e4" for f in features
                         ],
+                        marker_line=dict(color="#ffffff", width=1),
                         text=[f"{f['z_score']:.2f}" for f in features],
                         textposition="outside",
-                        textfont=dict(color="#e2e8f0", size=11),
+                        textfont=dict(color="#374151", size=11),
                     ))
-                    fig_feat.add_hline(y=2.5, line_dash="dot", line_color="rgba(239,68,68,0.6)",
-                                       annotation_text="Anomaly Threshold (Z=2.5)")
+                    fig_feat.add_hline(y=2.5, line_dash="dot", line_color="rgba(212,122,122,0.6)",
+                                       annotation_text="Anomaly Threshold (Z=2.5)",
+                                       annotation_font_color="#d47a7a")
                     fig_feat.update_layout(
                         **PLOTLY_LAYOUT,
                         height=250,
-                        title=dict(text="Z-Scores per Feature", font=dict(size=13, color="#94a3b8")),
+                        title=dict(text="Z-Scores per Feature", font=dict(size=13, color="#64748b")),
                         yaxis_title="Z-Score",
                     )
                     st.plotly_chart(fig_feat, use_container_width=True)
@@ -1047,13 +1214,14 @@ else:
         plan_header, plan_body = st.columns([1, 3])
         with plan_header:
             level = plan.get("level", "ROUTINE")
-            icon = plan.get("icon", "✅")
-            color = plan.get("color", "#22c55e")
+            color = plan.get("pastel_bg", "#f0fdf4")
+            text_color = plan.get("text_color", "#15803d")
+            border_color = plan.get("border_color", "#86efac")
             st.markdown(f"""
-            <div style="background:{color}22;border:1px solid {color}44;border-radius:10px;padding:20px;text-align:center;">
-                <div style="font-size:36px;">{icon}</div>
-                <div style="font-size:18px;font-weight:800;color:{color};margin-top:8px;">{level}</div>
-                <div style="font-size:11px;color:#94a3b8;margin-top:4px;">Response Level</div>
+            <div style="background:{color};border:1px solid {border_color};border-left:4px solid {border_color};
+                        border-radius:8px;padding:20px 16px;text-align:center;">
+                <div style="font-size:15px;font-weight:800;color:{text_color};letter-spacing:1px;">{level}</div>
+                <div style="font-size:11px;color:#64748b;margin-top:4px;text-transform:uppercase;letter-spacing:1px;">Response Level</div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -1066,9 +1234,9 @@ else:
                 <div class="intervention-card {priority_class}">
                     <div class="intervention-action">{action.get('action', '')}</div>
                     <div class="intervention-meta">
-                        <span>⚡ Priority: <b>{action.get('priority', 'N/A')}</b></span>
-                        <span>👤 Owner: <b>{action.get('owner', 'N/A')}</b></span>
-                        <span>🎯 Outcome: {action.get('outcome', 'N/A')}</span>
+                        <span>Priority: <b>{action.get('priority', 'N/A')}</b></span>
+                        <span>Owner: <b>{action.get('owner', 'N/A')}</b></span>
+                        <span>Outcome: {action.get('outcome', 'N/A')}</span>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -1083,7 +1251,7 @@ else:
             st.error(f"Map rendering error: {e}")
 
         # ── 10. Metric Reference ──────────────────────────────────────────
-        with st.expander("📚 Complete Metric Reference Guide", expanded=False):
+        with st.expander("Metric Reference Guide", expanded=False):
             ref1, ref2 = st.columns(2)
             with ref1:
                 st.markdown("""

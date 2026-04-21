@@ -14,8 +14,10 @@ class InterventionRecommender:
         self.interventions = {
             "Stable": {
                 "level": "ROUTINE",
-                "color": "#22c55e",
-                "icon": "✅",
+                # Pastel colour tokens used by app.py for the level badge
+                "pastel_bg":    "#f0fdf4",
+                "text_color":   "#15803d",
+                "border_color": "#86efac",
                 "actions": [
                     {
                         "priority": "Low",
@@ -33,8 +35,9 @@ class InterventionRecommender:
             },
             "Compressing": {
                 "level": "ADVISORY",
-                "color": "#f59e0b",
-                "icon": "⚠️",
+                "pastel_bg":    "#fffbeb",
+                "text_color":   "#b45309",
+                "border_color": "#fde68a",
                 "actions": [
                     {
                         "priority": "Medium",
@@ -52,7 +55,7 @@ class InterventionRecommender:
                         "priority": "Medium",
                         "action": "Deploy stewards to high-density zones for visual monitoring.",
                         "owner": "Field Stewards",
-                        "outcome": "Early detection of localized compression.",
+                        "outcome": "Early detection of localised compression.",
                     },
                     {
                         "priority": "Low",
@@ -64,20 +67,21 @@ class InterventionRecommender:
             },
             "Volatile": {
                 "level": "URGENT",
-                "color": "#ef4444",
-                "icon": "🚨",
+                "pastel_bg":    "#fef2f2",
+                "text_color":   "#b91c1c",
+                "border_color": "#fca5a5",
                 "actions": [
                     {
                         "priority": "Critical",
-                        "action": "HALT all entry immediately — close gates and barriers.",
+                        "action": "Halt all entry immediately — close gates and barriers.",
                         "owner": "Gate Teams",
                         "outcome": "Stop density increase at source.",
                     },
                     {
                         "priority": "Critical",
-                        "action": "Open ALL emergency exits and widen egress corridors.",
+                        "action": "Open all emergency exits and widen egress corridors.",
                         "owner": "Crowd Control",
-                        "outcome": "Maximize outflow to decompress crowd body.",
+                        "outcome": "Maximise outflow to decompress crowd body.",
                     },
                     {
                         "priority": "High",
@@ -87,7 +91,7 @@ class InterventionRecommender:
                     },
                     {
                         "priority": "High",
-                        "action": "Alert emergency services — transition from standby to ACTIVE.",
+                        "action": "Alert emergency services — transition from standby to active.",
                         "owner": "Emergency Services",
                         "outcome": "Medical and rescue teams positioned at exits.",
                     },
@@ -95,8 +99,9 @@ class InterventionRecommender:
             },
             "Agitated": {
                 "level": "EMERGENCY",
-                "color": "#9333ea",
-                "icon": "🆘",
+                "pastel_bg":    "#faf5ff",
+                "text_color":   "#6d28d9",
+                "border_color": "#c4b5fd",
                 "actions": [
                     {
                         "priority": "Critical",
@@ -126,8 +131,9 @@ class InterventionRecommender:
             },
             "Fragmenting": {
                 "level": "CAUTION",
-                "color": "#06b6d4",
-                "icon": "🔀",
+                "pastel_bg":    "#f0f9ff",
+                "text_color":   "#0369a1",
+                "border_color": "#bae6fd",
                 "actions": [
                     {
                         "priority": "High",

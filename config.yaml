@@ -14,11 +14,17 @@ api:
     env_key_name: "OPENWEATHERMAP_API_KEY"
     base_url: "https://api.openweathermap.org/data/2.5/weather"
 
-# ── Local SQLite database ────────────────────────────────────────────────────
-# No credentials required.  The DB file is created automatically at:
-#   <project_root>/data/telemetry.db
+# ── Neon PostgreSQL database ─────────────────────────────────────────────────
+# Password is read from the NEON_PASS environment variable (or st.secrets).
+# The schema is created / migrated automatically on first connection.
 database:
-  type: "local"           # "local" = SQLite (default) | future: "supabase"
+  type: "neon"
+  pooler_host: "ep-aged-cherry-aoxn5nod-pooler.c-2.ap-southeast-1.aws.neon.tech"
+  direct_host: "ep-aged-cherry-aoxn5nod.c-2.ap-southeast-1.aws.neon.tech"
+  name:        "neondb"
+  role:        "neondb_owner"
+  port:        5432
+  password_env: "NEON_PASS"
 
 location:
   # Default monitoring point — can be changed interactively in the UI

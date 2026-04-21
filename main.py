@@ -76,28 +76,28 @@ def main():
 
             print("\033[2J\033[H", end="")   # clear screen
             print("=" * 60)
-            print(f"   🏙️  CROWD PSYCHOLOGY STATE ENGINE | {local_time}")
-            print(f"   📍  {loc.get('name', 'Unknown')}")
+            print(f"   CROWD PSYCHOLOGY STATE ENGINE | {local_time}")
+            print(f"   Location: {loc.get('name', 'Unknown')}")
             if is_simulated:
-                print("   ⚠️  [SIMULATED DATA — API key not configured]")
+                print("   [SIMULATED DATA — API key not configured]")
             print("=" * 60)
 
-            print(f"\n📊 TELEMETRY")
+            print(f"\nTELEMETRY")
             print(f"   {'Signal (Congestion)':<25} : {congestion:.2f}  " +
                   ("(Gridlock)" if congestion > 0.8 else "(Free Flow)" if congestion < 0.2 else ""))
             print(f"   {'Speed (km/h)':<25} : {current_speed:.1f}")
             print(f"   {'Metric (Gradient)':<25} : {gradient:.2f}")
             print(f"   {'Metric (Velocity Var)':<25} : {velocity_var:.2f}")
 
-            print(f"\n🧠 DIAGNOSIS")
+            print(f"\nDIAGNOSIS")
             print(f"   {'STATE':<25} : {state.upper()}")
             print(f"   {'CONFIDENCE':<25} : {int(confidence * 100)}%")
 
-            print(f"\n🛡️  INTERVENTIONS")
+            print(f"\nINTERVENTIONS")
             if not actions:
                 print("   (No specific actions required)")
             for action in actions:
-                print(f"   👉 {action}")
+                print(f"   -> {action}")
             print("-" * 60)
 
             time.sleep(3)

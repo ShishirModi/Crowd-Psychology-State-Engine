@@ -1,180 +1,328 @@
-import sqlite3
+"""
+data_layer/database.py
+PostgreSQL persistence layer backed by Neon DB.
+
+Features
+--------
+* Auto-creates the `crowd_telemetry` table on first connection.
+* Detects columns that are missing from an existing table and adds them
+  non-destructively via ALTER TABLE (schema migration without data loss).
+* Password resolved from Streamlit secrets → os.environ → raises clear error.
+* `connected` property lets app.py surface a live status badge.
+* Falls back silently (logs a warning, disables persistence) if the DB is
+  unreachable — the rest of the app continues to function.
+* Identical public interface to the previous SQLite manager so no other
+  file requires changes.
+"""
+
 import os
-from datetime import datetime
+import logging
+from contextlib import contextmanager
+from datetime import datetime, timezone
+from typing import Optional
 
-# ---------------------------------------------------------------------------
-# DB path: stored under ~/.cpse/telemetry.db
-#
-# The workspace folder (mnt/) is a FUSE mount of the user's local filesystem.
-# Most FUSE drivers don't support the fcntl file-locking that SQLite requires,
-# so we store the DB in the session home directory instead — a real filesystem
-# that supports all SQLite operations.  Data persists across Streamlit restarts.
-# ---------------------------------------------------------------------------
-DB_PATH = os.path.join(os.path.expanduser("~"), ".cpse", "telemetry.db")
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
+log = logging.getLogger(__name__)
+
+# ── Connection parameters ────────────────────────────────────────────────────
+# Use the pooler endpoint for all application traffic; it multiplexes many
+# short-lived Streamlit connections onto a handful of persistent Postgres
+# connections, keeping Neon's "compute" awake and reducing cold-start latency.
+_POOLER_HOST = "ep-aged-cherry-aoxn5nod-pooler.c-2.ap-southeast-1.aws.neon.tech"
+_DIRECT_HOST = "ep-aged-cherry-aoxn5nod.c-2.ap-southeast-1.aws.neon.tech"
+_DATABASE    = "neondb"
+_ROLE        = "neondb_owner"
+_PORT        = 5432
+
+# ── Target schema ────────────────────────────────────────────────────────────
+# Full column list. The auto-migration loop adds any column here that is absent
+# from the live table, so new columns can be introduced just by extending this dict.
+_TABLE = "crowd_telemetry"
+
+_SCHEMA_COLUMNS: dict[str, str] = {
+    # name            postgres type + constraints
+    "speed":          "DOUBLE PRECISION",
+    "gradient":       "DOUBLE PRECISION",
+    "velocity_var":   "DOUBLE PRECISION",
+    "anomaly_score":  "DOUBLE PRECISION",
+    "risk_score":     "DOUBLE PRECISION",
+    "session_id":     "TEXT",
+}
+
+# ── Streamlit import (optional — only available when running inside st) ───────
+try:
+    import streamlit as st
+    _HAS_ST = True
+except ImportError:
+    _HAS_ST = False
 
 
-class LocalDatabaseManager:
+# ─────────────────────────────────────────────────────────────────────────────
+class NeonDatabaseManager:
     """
-    SQLite-backed persistence layer.
+    Neon-backed PostgreSQL manager with auto schema bootstrap and migration.
 
-    Drop-in replacement for the old SupabaseManager — identical public
-    interface so the rest of the codebase (app.py, main.py) requires no
-    changes to how the DB is called.
+    Public methods
+    --------------
+    insert_telemetry(data)          — write one telemetry record
+    fetch_history(location, limit)  — chronological history for a location
+    fetch_recent_logs(limit)        — latest N rows globally
+    fetch_filtered_logs(...)        — query with location / anomaly filters
+    fetch_unique_locations()        — distinct location names
 
-    The database file is created automatically on first use.
+    Properties
+    ----------
+    connected : bool   — True when the DB is reachable and schema is ready
+    status_label : str — human-readable connection status for the UI
     """
 
-    def __init__(self, db_path: str = DB_PATH):
-        self.db_path = db_path
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
-        self._init_schema()
-        print(f"DEBUG: SQLite database ready → {self.db_path}")
+    def __init__(self):
+        self._dsn: Optional[str] = None
+        self._connected: bool = False
+        self._status: str = "Not initialised"
 
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
+        # Resolve password
+        password = self._resolve_password()
+        if not password:
+            self._status = "NEON_PASS not set — persistence disabled"
+            log.warning(self._status)
+            return
 
-    def _get_conn(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row          # rows behave like dicts
-        return conn
+        self._dsn = (
+            f"host={_POOLER_HOST} "
+            f"port={_PORT} "
+            f"dbname={_DATABASE} "
+            f"user={_ROLE} "
+            f"password={password} "
+            f"sslmode=require "
+            f"connect_timeout=10"
+        )
 
-    def _init_schema(self):
-        """Create the table and indexes if they don't exist yet."""
-        with self._get_conn() as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS crowd_telemetry (
-                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-                    created_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-                    location_name TEXT    NOT NULL,
-                    latitude      REAL    NOT NULL DEFAULT 0,
-                    longitude     REAL    NOT NULL DEFAULT 0,
-                    congestion    REAL    NOT NULL DEFAULT 0,
-                    speed         REAL,
-                    gradient      REAL,
-                    velocity_var  REAL,
-                    anomaly_score REAL,
-                    state         TEXT    NOT NULL DEFAULT 'Unknown',
+        # Bootstrap schema
+        try:
+            self._bootstrap_schema()
+            self._connected = True
+            self._status = f"Connected — {_DATABASE}@{_POOLER_HOST.split('.')[0]}"
+            log.info(f"Neon DB ready: {self._status}")
+        except Exception as exc:
+            self._connected = False
+            self._status = f"Connection failed: {exc}"
+            log.error(f"Neon DB bootstrap error: {exc}")
+
+    # ── Properties ───────────────────────────────────────────────────────────
+
+    @property
+    def connected(self) -> bool:
+        return self._connected
+
+    @property
+    def status_label(self) -> str:
+        return self._status
+
+    # ── Internal helpers ─────────────────────────────────────────────────────
+
+    @staticmethod
+    def _resolve_password() -> Optional[str]:
+        """Check Streamlit secrets then os.environ for NEON_PASS."""
+        if _HAS_ST:
+            try:
+                pw = st.secrets.get("NEON_PASS")
+                if pw:
+                    return pw
+            except Exception:
+                pass
+        return os.getenv("NEON_PASS")
+
+    @contextmanager
+    def _cursor(self, dict_cursor: bool = False):
+        """
+        Context manager that opens a connection, yields a cursor, commits on
+        clean exit and rolls back + closes on exception.
+        """
+        factory = RealDictCursor if dict_cursor else None
+        conn = psycopg2.connect(self._dsn)
+        try:
+            cur = conn.cursor(cursor_factory=factory) if factory else conn.cursor()
+            yield cur
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    def _bootstrap_schema(self):
+        """
+        Step 1 — CREATE TABLE IF NOT EXISTS with full baseline schema.
+        Step 2 — Introspect information_schema; ALTER TABLE for any column
+                 that exists in _SCHEMA_COLUMNS but not yet in the live table.
+        Step 3 — CREATE INDEX IF NOT EXISTS for the two common query patterns.
+        """
+        with self._cursor() as cur:
+
+            # ── 1. Create base table ─────────────────────────────────────
+            cur.execute(f"""
+                CREATE TABLE IF NOT EXISTS {_TABLE} (
+                    id            SERIAL          PRIMARY KEY,
+                    created_at    TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+                    location_name TEXT            NOT NULL,
+                    latitude      DOUBLE PRECISION NOT NULL DEFAULT 0,
+                    longitude     DOUBLE PRECISION NOT NULL DEFAULT 0,
+                    congestion    DOUBLE PRECISION NOT NULL DEFAULT 0,
+                    speed         DOUBLE PRECISION,
+                    gradient      DOUBLE PRECISION,
+                    velocity_var  DOUBLE PRECISION,
+                    anomaly_score DOUBLE PRECISION,
+                    risk_score    DOUBLE PRECISION,
+                    state         TEXT            NOT NULL DEFAULT 'Unknown',
                     session_id    TEXT
                 )
             """)
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_location   ON crowd_telemetry(location_name)"
-            )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_created_at ON crowd_telemetry(created_at)"
-            )
-            conn.commit()
 
-    # ------------------------------------------------------------------
-    # Public interface  (mirrors SupabaseManager exactly)
-    # ------------------------------------------------------------------
+            # ── 2. Schema migration — add missing columns ─────────────────
+            cur.execute("""
+                SELECT column_name
+                FROM   information_schema.columns
+                WHERE  table_schema = 'public'
+                  AND  table_name   = %s
+            """, (_TABLE,))
+            existing_cols = {row[0] for row in cur.fetchall()}
+
+            for col_name, col_type in _SCHEMA_COLUMNS.items():
+                if col_name not in existing_cols:
+                    cur.execute(
+                        f"ALTER TABLE {_TABLE} "
+                        f"ADD COLUMN IF NOT EXISTS {col_name} {col_type}"
+                    )
+                    log.info(f"Schema migration: added column '{col_name}' ({col_type})")
+
+            # ── 3. Indexes ────────────────────────────────────────────────
+            cur.execute(f"""
+                CREATE INDEX IF NOT EXISTS idx_{_TABLE}_location
+                ON {_TABLE} (location_name)
+            """)
+            cur.execute(f"""
+                CREATE INDEX IF NOT EXISTS idx_{_TABLE}_created_at
+                ON {_TABLE} (created_at DESC)
+            """)
+
+    # ── Public interface ─────────────────────────────────────────────────────
 
     def insert_telemetry(self, data: dict):
-        """Insert one telemetry record."""
+        """Persist one telemetry snapshot. Silently skips if not connected."""
+        if not self._connected:
+            return
         try:
-            with self._get_conn() as conn:
-                conn.execute(
-                    """
-                    INSERT INTO crowd_telemetry
-                        (location_name, latitude, longitude, congestion, speed,
-                         gradient, velocity_var, anomaly_score, state, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        data.get("location_name", "Unknown"),
-                        data.get("lat",           0.0),
-                        data.get("lon",           0.0),
-                        data.get("congestion",    0.0),
-                        data.get("speed",         0.0),
-                        data.get("gradient",      0.0),
-                        data.get("velocity_var",  0.0),
-                        data.get("anomaly_score", 0.0),
-                        data.get("state",         "Unknown"),
-                        datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    ),
-                )
-                conn.commit()
-        except Exception as e:
-            print(f"ERROR: SQLite insert failed: {e}")
+            with self._cursor() as cur:
+                cur.execute(f"""
+                    INSERT INTO {_TABLE}
+                        (location_name, latitude, longitude,
+                         congestion, speed, gradient,
+                         velocity_var, anomaly_score, risk_score,
+                         state, created_at)
+                    VALUES
+                        (%s, %s, %s,
+                         %s, %s, %s,
+                         %s, %s, %s,
+                         %s, %s)
+                """, (
+                    data.get("location_name", "Unknown"),
+                    data.get("lat",           0.0),
+                    data.get("lon",           0.0),
+                    data.get("congestion",    0.0),
+                    data.get("speed",         0.0),
+                    data.get("gradient",      0.0),
+                    data.get("velocity_var",  0.0),
+                    data.get("anomaly_score", 0.0),
+                    data.get("risk_score",    0.0),
+                    data.get("state",         "Unknown"),
+                    datetime.now(timezone.utc),
+                ))
+        except Exception as exc:
+            log.error(f"insert_telemetry failed: {exc}")
+            self._connected = False          # flag degraded state
+            self._status    = f"Write error: {exc}"
 
     def fetch_history(self, location_name: str, limit: int = 50) -> list:
-        """Fetch recent records for a specific location (chronological order)."""
+        """Return up to `limit` rows for a location in ascending time order."""
+        if not self._connected:
+            return []
         try:
-            with self._get_conn() as conn:
-                rows = conn.execute(
-                    """
-                    SELECT * FROM crowd_telemetry
-                    WHERE  location_name = ?
-                    ORDER  BY created_at DESC
-                    LIMIT  ?
-                    """,
-                    (location_name, limit),
-                ).fetchall()
-                data = [dict(r) for r in rows]
-                return data[::-1]           # flip to chronological
-        except Exception as e:
-            print(f"ERROR: SQLite fetch_history failed: {e}")
+            with self._cursor(dict_cursor=True) as cur:
+                cur.execute(f"""
+                    SELECT * FROM (
+                        SELECT * FROM {_TABLE}
+                        WHERE  location_name = %s
+                        ORDER  BY created_at DESC
+                        LIMIT  %s
+                    ) sub
+                    ORDER BY created_at ASC
+                """, (location_name, limit))
+                return [dict(r) for r in cur.fetchall()]
+        except Exception as exc:
+            log.error(f"fetch_history failed: {exc}")
             return []
 
     def fetch_recent_logs(self, limit: int = 100) -> list:
-        """Fetch the most-recent global logs (no location filter)."""
+        """Return the most recent `limit` rows globally."""
         return self.fetch_filtered_logs(limit=limit)
 
     def fetch_filtered_logs(
         self,
         limit: int = 100,
-        location: str = None,
+        location: Optional[str] = None,
         anomaly_only: bool = False,
     ) -> list:
-        """Fetch logs with optional location and anomaly filters."""
+        """Query with optional location filter and anomaly-score threshold."""
+        if not self._connected:
+            return []
         try:
-            conditions = []
-            params: list = []
+            conditions: list[str] = []
+            params:     list      = []
 
             if location and location != "All":
-                conditions.append("location_name = ?")
+                conditions.append("location_name = %s")
                 params.append(location)
-
             if anomaly_only:
                 conditions.append("anomaly_score > 2.5")
 
             where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
-            query = f"""
-                SELECT * FROM crowd_telemetry
-                {where}
-                ORDER BY created_at DESC
-                LIMIT ?
-            """
             params.append(limit)
 
-            with self._get_conn() as conn:
-                rows = conn.execute(query, params).fetchall()
-                return [dict(r) for r in rows]
-        except Exception as e:
-            print(f"ERROR: SQLite fetch_filtered_logs failed: {e}")
+            with self._cursor(dict_cursor=True) as cur:
+                cur.execute(
+                    f"SELECT * FROM {_TABLE} {where} "
+                    f"ORDER BY created_at DESC LIMIT %s",
+                    params,
+                )
+                return [dict(r) for r in cur.fetchall()]
+        except Exception as exc:
+            log.error(f"fetch_filtered_logs failed: {exc}")
             return []
 
     def fetch_unique_locations(self) -> list:
         """Return a sorted list of distinct location names."""
+        if not self._connected:
+            return []
         try:
-            with self._get_conn() as conn:
-                rows = conn.execute(
-                    "SELECT DISTINCT location_name FROM crowd_telemetry ORDER BY location_name"
-                ).fetchall()
-                return [r["location_name"] for r in rows]
-        except Exception as e:
-            print(f"ERROR: SQLite fetch_unique_locations failed: {e}")
+            with self._cursor() as cur:
+                cur.execute(
+                    f"SELECT DISTINCT location_name FROM {_TABLE} "
+                    f"ORDER BY location_name"
+                )
+                return [row[0] for row in cur.fetchall()]
+        except Exception as exc:
+            log.error(f"fetch_unique_locations failed: {exc}")
             return []
 
 
-# ---------------------------------------------------------------------------
-# Backwards-compatibility alias (nothing outside this file imports the class
-# by name, but keep it in case tests reference it)
-# ---------------------------------------------------------------------------
-SupabaseManager = LocalDatabaseManager
+# ── Compatibility aliases ────────────────────────────────────────────────────
+LocalDatabaseManager = NeonDatabaseManager
+SupabaseManager      = NeonDatabaseManager
 
 
-# Factory — used by app.py:  from data_layer.database import get_db_client
-def get_db_client() -> LocalDatabaseManager:
-    return LocalDatabaseManager()
+def get_db_client() -> NeonDatabaseManager:
+    """Factory used by app.py and main.py."""
+    return NeonDatabaseManager()
