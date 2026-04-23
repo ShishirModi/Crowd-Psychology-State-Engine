@@ -1,4 +1,3 @@
-import sys
 import time
 from signals.tomtom import get_signal_provider
 from metrics.compression import CrowdMetrics
