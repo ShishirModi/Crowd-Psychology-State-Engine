@@ -22,8 +22,7 @@ class AnomalyDetector:
 
     def train(self, historical_vectors):
         """Pre-load history for faster calibration."""
-        for v in historical_vectors:
-            self.history.append(v)
+        self.history.extend(historical_vectors)
 
     def update_and_detect(self, current_vector):
         """
