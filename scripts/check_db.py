@@ -15,24 +15,24 @@ def check_setup():
     key = os.getenv("SUPABASE_KEY")
     
     if not url or not key:
-        print("❌ FAILED: SUPABASE_URL or SUPABASE_KEY missing from .env")
+        print("[ERROR] FAILED: SUPABASE_URL or SUPABASE_KEY missing from .env")
         return
         
-    print(f"✅ Credentials found for: {url}")
+    print(f"[OK] Credentials found for: {url}")
     
     db = get_db_client()
     if not db.client:
-        print("❌ FAILED: Could not initialize Supabase client.")
+        print("[ERROR] FAILED: Could not initialize Supabase client.")
         return
 
     print("Attempting to fetch recent logs...")
     try:
         # Try to select 1 row
         logs = db.fetch_recent_logs(limit=1)
-        print("✅ SUCCESS: Connection established and table exists.")
+        print("[OK] SUCCESS: Connection established and table exists.")
         print(f"   Fetched {len(logs)} records.")
     except Exception as e:
-        print("❌ FAILED: API Error.")
+        print("[ERROR] FAILED: API Error.")
         print(f"   Error: {e}")
         print("\nPossible Causes:")
         print("   1. Table 'crowd_telemetry' does not exist. (Run scripts/db_setup.sql in Supabase)")

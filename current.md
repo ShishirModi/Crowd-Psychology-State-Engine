@@ -53,7 +53,7 @@
 - **Current Mode**: **LIVE** (Connected to TomTom & OpenWeatherMap).
 - **Last Verification**: 2026-02-18
 - **Result**: System fully functional. Unit tests passed. Database Integration Complete.
-- **Dependencies**: `requests`, `pandas`, `numpy`, `streamlit`, `javascript`, `supabase`.
+- **Dependencies**: `requests`, `pandas`, `numpy`, `streamlit`, `psycopg2`, `plotly`.
 
 ## 4. Workflows
 1.  **Main Loop (`app.py`)**:

@@ -141,11 +141,11 @@ header {visibility: hidden;}
 }
 
 /* pastel state colours */
-.banner-stable      { background:#f0fdf4; border-color:#bbf7d0; border-left-color:#22c55e; color:#15803d; }
-.banner-compressing { background:#fffbeb; border-color:#fde68a; border-left-color:#f59e0b; color:#b45309; }
-.banner-volatile    { background:#fef2f2; border-color:#fecaca; border-left-color:#f87171; color:#b91c1c; }
-.banner-agitated    { background:#faf5ff; border-color:#ddd6fe; border-left-color:#a78bfa; color:#6d28d9; }
-.banner-fragmenting { background:#f0f9ff; border-color:#bae6fd; border-left-color:#38bdf8; color:#0369a1; }
+.banner-stable      { background:#f0fdf4; border-color:#bbf7d0; border-left-color:#86efac; color:#15803d; }
+.banner-compressing { background:#fffbeb; border-color:#fde68a; border-left-color:#fde68a; color:#b45309; }
+.banner-volatile    { background:#fef2f2; border-color:#fecaca; border-left-color:#fca5a5; color:#b91c1c; }
+.banner-agitated    { background:#faf5ff; border-color:#ddd6fe; border-left-color:#c4b5fd; color:#6d28d9; }
+.banner-fragmenting { background:#f0f9ff; border-color:#bae6fd; border-left-color:#bae6fd; color:#0369a1; }
 
 /* ── Risk Score Bar ───────────────────────────────────────────────── */
 .risk-bar-container {
@@ -229,10 +229,9 @@ header {visibility: hidden;}
     margin-bottom: 10px;
     border: 1px solid #e2e8f0;
     border-left: 4px solid #cbd5e1;
-    transition: box-shadow 0.15s ease;
 }
 .intervention-card:hover {
-    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    background-color: #f8fafc;
 }
 .intervention-card.priority-critical { border-left-color: #fca5a5; }
 .intervention-card.priority-high     { border-left-color: #fdba74; }
@@ -791,6 +790,10 @@ else:
         else:
             with st.spinner("Syncing with live signal feeds..."):
                 telemetry = signal_provider.fetch_telemetry()
+                if telemetry is None:
+                    st.error("Failed to fetch telemetry data and simulation is disabled.")
+                    st.stop()
+                    
                 congestion = telemetry["congestion"]
                 current_speed = telemetry["current_speed"]
 
@@ -884,7 +887,7 @@ else:
                 <div class="risk-bar-value" style="color:{bar_color};">{risk_score}/100</div>
             </div>
             <div class="risk-bar-outer">
-                <div class="risk-bar-fill" style="width:{risk_score}%;background:linear-gradient(90deg,#22c55e,#eab308,#f97316,#ef4444);"></div>
+                <div class="risk-bar-fill" style="width:{risk_score}%;background:{bar_color};"></div>
             </div>
             <div style="font-size:11px;color:#94a3b8;margin-top:6px;">{risk_info.get('verdict','')}</div>
             <div style="font-size:10px;color:#64748b;margin-top:2px;">Formula: {risk_info.get('formula','')}</div>

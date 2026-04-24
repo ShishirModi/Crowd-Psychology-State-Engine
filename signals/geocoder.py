@@ -73,11 +73,7 @@ class TomTomGeocoder:
             candidates = self.search(query)
             
             if not candidates:
-                print("❌ Location not found. Please try again.")
-                continue
-                
-            if not candidates:
-                print("❌ Location not found. Please try again.")
+                print("[ERROR] Location not found. Please try again.")
                 continue
             
             print(f"\nFound {len(candidates)} matches:")
@@ -95,9 +91,9 @@ class TomTomGeocoder:
                 choice_idx = int(choice) - 1
                 if 0 <= choice_idx < len(candidates):
                     selected = candidates[choice_idx]
-                    print(f"✅ Selected: {selected['name']}")
+                    print(f"[OK] Selected: {selected['name']}")
                     return selected
                 else:
-                    print("❌ Invalid selection.")
+                    print("[ERROR] Invalid selection.")
             except ValueError:
-                print("❌ Invalid input.")
+                print("[ERROR] Invalid input.")

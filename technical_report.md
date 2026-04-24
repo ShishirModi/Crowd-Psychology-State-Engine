@@ -228,9 +228,9 @@ Raw telemetry is transformed into fixed-dimension vectors for anomaly detection 
 
 ## 7. Storage & Persistence (`data_layer/database.py`)
 
-Telemetry streams to **Supabase (PostgreSQL)** via the `supabase-py` client library. The `crowd_telemetry` table stores: `location_name`, `latitude`, `longitude`, `congestion`, `speed`, `gradient`, `velocity_var`, `anomaly_score`, `state`, `session_id`, and `created_at`.
+Telemetry streams to **Neon PostgreSQL** via the `psycopg2` client library. The schema is automatically bootstrapped and migrated. The `crowd_telemetry` table stores: `location_name`, `latitude`, `longitude`, `congestion`, `speed`, `gradient`, `velocity_var`, `anomaly_score`, `state`, `session_id`, and `created_at`.
 
-Indexes on `created_at` (descending) and `location_name` support efficient filtered queries. Row-Level Security (RLS) policies restrict operations to insert and select.
+Indexes on `created_at` (descending) and `location_name` support efficient filtered queries. The connection uses a pooler endpoint to handle multiplexed Streamlit connections effectively.
 
 The admin dashboard provides:
 - Filtered querying by location, record limit, and anomaly-only mode
@@ -301,9 +301,14 @@ api:
     use_env_key: true
     env_key_name: "OPENWEATHERMAP_API_KEY"
     base_url: "https://api.openweathermap.org/data/2.5/weather"
-  supabase:
-    env_url_name: "SUPABASE_URL"
-    env_key_name: "SUPABASE_KEY"
+database:
+  type: "neon"
+  pooler_host: "ep-aged-cherry-aoxn5nod-pooler.c-2.ap-southeast-1.aws.neon.tech"
+  direct_host: "ep-aged-cherry-aoxn5nod.c-2.ap-southeast-1.aws.neon.tech"
+  name:        "neondb"
+  role:        "neondb_owner"
+  port:        5432
+  password_env: "NEON_PASS"
 
 location:
   name: "Delhi City Center"

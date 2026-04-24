@@ -11,7 +11,7 @@ CPSE is designed for deployment on **Streamlit Community Cloud** and features an
 ## Key Features
 
 ### Real-Time Signal Fusion
-CPSE ingests data from the **TomTom Traffic Flow API** and **OpenWeatherMap API** with automatic fallback to high-fidelity stochastic simulation when API keys are unavailable. The system recalculates every telemetry cycle (configurable, default 30 seconds) and persists results to **Supabase (PostgreSQL)** for long-term trend analysis.
+CPSE ingests data from the **TomTom Traffic Flow API** and **OpenWeatherMap API** with automatic fallback to high-fidelity stochastic simulation when API keys are unavailable. The system recalculates every telemetry cycle (configurable, default 30 seconds) and persists results to **Neon PostgreSQL** for long-term trend analysis.
 
 ### Physics-Based Crowd Metrics with Full Diagnostics
 Two primary metrics drive classification, each returning a detailed sub-metric breakdown for transparency:
@@ -48,7 +48,7 @@ The Streamlit frontend uses a custom dark-theme design system built on the Inter
 - **Confidence breakdown expander** listing all penalties and bonuses applied
 
 ### Secure Telemetry Persistence
-All telemetry streams to **Supabase (PostgreSQL)** with row-level security. An admin dashboard provides filtered querying by location, record limit, and anomaly-only mode, with CSV export and professional Plotly trend charts.
+All telemetry streams to **Neon PostgreSQL** utilizing connection pooling for optimal real-time performance. An admin dashboard provides filtered querying by location, record limit, and anomaly-only mode, with CSV export and professional Plotly trend charts.
 
 ### Privacy-by-Design
 CPSE captures only aggregate macro-flows. No personally identifiable information (PII) or individualized tracking metrics are collected or retained. All classifications are produced by transparent, explainable rule-based logic.
@@ -79,7 +79,7 @@ Crowd-Psychology-State-Engine/
 │       └── gnn_stub.py         #   Graph Neural Network placeholder (future)
 │
 ├── data_layer/                 # Persistence & vectorization
-│   ├── database.py             #   Supabase PostgreSQL client
+│   ├── database.py             #   Neon PostgreSQL client
 │   └── vectorizer.py           #   State & environmental vector creation
 │
 ├── interventions/              # Response planning
@@ -128,8 +128,7 @@ Create a `.streamlit/secrets.toml` file or set the following as environment vari
 TOMTOM_API_KEY = "your_tomtom_traffic_api_key"
 OPENWEATHERMAP_API_KEY = "your_openweathermap_api_key"
 APP_PASSWORD = ["admin_password", "viewer_password"]
-SUPABASE_URL = "your_supabase_project_url"
-SUPABASE_KEY = "your_supabase_api_key"
+NEON_PASS = "your_neon_db_password"
 ```
 
 The first password in `APP_PASSWORD` grants Admin Console access (database viewer). Subsequent passwords provide standard monitoring access. If no password is configured, the system defaults to `cpseisawesome` for local development.
@@ -187,4 +186,4 @@ The classifier applies velocity variance overrides (CV > 0.25 escalates one seve
 - [Phase Plan](documents/phase_plan.md) — Development roadmap
 - [Metrics Guide](documents/metrics.md) — Metric definitions and formulas
 - [Database Architecture](documents/database.md) — Schema, indexing, and persistence design
-- [Security & Privacy](documents/security.md) — Row-level security, API key management, and privacy guarantees
+- [Security & Privacy](documents/security.md) — API key management, and privacy guarantees

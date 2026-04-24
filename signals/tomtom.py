@@ -54,8 +54,9 @@ class TomTomSignal:
             # Format: https://{baseUrl}/traffic/services/4/flowSegmentData/absolute/10/json?key={apiKey}&point={point}
             
             # Format coordinates to 5 decimal places (TomTom best practice)
-            lat = round(self.location.get('lat'), 5)
-            lon = round(self.location.get('lon'), 5)
+            # Use float() to ensure it doesn't crash if it's parsed as a string
+            lat = round(float(self.location.get('lat', 0.0)), 5)
+            lon = round(float(self.location.get('lon', 0.0)), 5)
             point = f"{lat},{lon}"
             
             # Construct URL manually or use params. TomTom documentation specifies structure.
@@ -74,7 +75,7 @@ class TomTomSignal:
             
             if response.status_code == 403:
                 print("Error: API Key Invalid or Forbidden.")
-                return self._simulate_telemetry()
+                return self._simulate_telemetry() if self.simulation_enabled else None
             
             response.raise_for_status()
             data = response.json()
@@ -82,7 +83,7 @@ class TomTomSignal:
             # Parse response
             if 'flowSegmentData' not in data:
                 print(f"Warning: 'flowSegmentData' missing in response. Data keys: {list(data.keys())}")
-                return self._simulate_telemetry()
+                return self._simulate_telemetry() if self.simulation_enabled else None
                 
             flow_data = data['flowSegmentData']
             current_speed = flow_data.get('currentSpeed')
@@ -90,7 +91,7 @@ class TomTomSignal:
             
             if current_speed is None or free_flow_speed is None:
                 print("Warning: Missing speed data in response.")
-                return self._simulate_telemetry()
+                return self._simulate_telemetry() if self.simulation_enabled else None
                 
             # Sanity Check for zero free-flow
             if free_flow_speed <= 0:
@@ -113,7 +114,7 @@ class TomTomSignal:
             from utils.security import scrub_sensitive_data
             error_msg = scrub_sensitive_data(e)
             print(f"API Error: {error_msg}. Falling back to simulation.")
-            return self._simulate_telemetry()
+            return self._simulate_telemetry() if self.simulation_enabled else None
 
     def _simulate_telemetry(self):
         """Simulates detailed telemetry."""

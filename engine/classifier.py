@@ -20,31 +20,31 @@ STATE_DESCRIPTIONS = {
         "label": "Stable",
         "severity": 0,
         "summary": "Normal crowd flow with no signs of compression or turbulence.",
-        "color": "#22c55e",
+        "color": "#86efac",
     },
     "Compressing": {
         "label": "Compressing",
         "severity": 1,
         "summary": "Crowd density is rising — early signs of inflow exceeding outflow capacity.",
-        "color": "#f59e0b",
+        "color": "#fde68a",
     },
     "Volatile": {
         "label": "Volatile",
         "severity": 2,
         "summary": "High compression with potential for rapid state change. Turbulence detected.",
-        "color": "#ef4444",
+        "color": "#fca5a5",
     },
     "Agitated": {
         "label": "Agitated",
         "severity": 3,
         "summary": "Critical crowd state — extreme compression combined with high turbulence.",
-        "color": "#9333ea",
+        "color": "#c4b5fd",
     },
     "Fragmenting": {
         "label": "Fragmenting",
         "severity": 2,
         "summary": "Rapid density drop — crowd is dispersing unevenly, risk of stampede at exits.",
-        "color": "#06b6d4",
+        "color": "#bae6fd",
     },
 }
 
