@@ -2,23 +2,33 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.egg-info/
+dist/
+build/
 
-# Environment Variables
+# Environment
 .env
 
-# Streamlit
-.streamlit/
+# Django
+*.sqlite3
+*.db
 
-# OS specific
+# Redis
+*.rdb
+
+# OS
 .DS_Store
 Thumbs.db
 
-# Database
-*.db
-*.sqlite3
-*.sqlite
+# Next.js
+frontend/.next/
+frontend/node_modules/
+frontend/.env.local
 
-# Others
-CLAUDE.md
-.mcp.json
+# IDE
+.vscode/
+.idea/
+
+# Misc
 .claude/
+.mcp.json
