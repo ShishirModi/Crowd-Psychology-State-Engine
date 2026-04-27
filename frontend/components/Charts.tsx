@@ -5,7 +5,6 @@ import {
   Tooltip, ResponsiveContainer, ReferenceLine, PieChart, Pie, Cell,
   RadialBarChart, RadialBar,
 } from 'recharts'
-import type { AnalysisResult } from '@/lib/types'
 
 export interface HistoryPoint {
   time: string
