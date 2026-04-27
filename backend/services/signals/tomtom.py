@@ -88,25 +88,37 @@ class TomTomSignal:
             flow_data = data['flowSegmentData']
             current_speed = flow_data.get('currentSpeed')
             free_flow_speed = flow_data.get('freeFlowSpeed')
-            
+            current_time = flow_data.get('currentTravelTime')
+            free_flow_time = flow_data.get('freeFlowTravelTime')
+
             if current_speed is None or free_flow_speed is None:
                 print("Warning: Missing speed data in response.")
                 return self._simulate_telemetry() if self.simulation_enabled else None
-                
+
             # Sanity Check for zero free-flow
             if free_flow_speed <= 0:
                 free_flow_speed = 50.0 # Default fallback
-                
+
             # Calculate congestion
+            # Use travel times if available to avoid integer speed truncation
+            # which causes "all metrics as 0" when traffic varies slightly.
             congestion = 0.0
-            if free_flow_speed > 0:
+            if current_time and free_flow_time and current_time > 0:
+                exact_congestion = 1.0 - (free_flow_time / current_time)
+                congestion = max(0.0, min(1.0, exact_congestion))
+
+                # Derive exact current speed to capture minor turbulence
+                exact_current_speed = free_flow_speed * (free_flow_time / current_time)
+                current_speed = exact_current_speed
+            elif free_flow_speed > 0:
+                # Fallback to integer speeds
                 congestion = 1.0 - (current_speed / free_flow_speed)
                 congestion = max(0.0, min(1.0, congestion))
-            
+
             return {
-                "congestion": congestion,
-                "current_speed": current_speed,
-                "free_flow_speed": free_flow_speed,
+                "congestion": float(congestion),
+                "current_speed": float(current_speed),
+                "free_flow_speed": float(free_flow_speed),
                 "is_simulated": False
             }
             
