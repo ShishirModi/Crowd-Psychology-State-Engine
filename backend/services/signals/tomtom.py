@@ -91,6 +91,7 @@ class TomTomSignal:
             current_time = flow_data.get('currentTravelTime')
             free_flow_time = flow_data.get('freeFlowTravelTime')
 
+
             if current_speed is None or free_flow_speed is None:
                 print("Warning: Missing speed data in response.")
                 return self._simulate_telemetry() if self.simulation_enabled else None
