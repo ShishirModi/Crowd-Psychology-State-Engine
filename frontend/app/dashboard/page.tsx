@@ -8,6 +8,7 @@ import RiskBar from '@/components/RiskBar'
 import MetricsGrid from '@/components/MetricsGrid'
 import Charts from '@/components/Charts'
 import type { HistoryPoint } from '@/components/Charts'
+import InterventionPanel from '@/components/InterventionPanel'
 import { analyze, pollResult } from '@/lib/api'
 import type { AnalyzeParams, PollResponse, AnalysisResult } from '@/lib/types'
 
@@ -206,6 +207,9 @@ export default function DashboardPage() {
             />
             <MetricsGrid result={doneResult} />
             <Charts history={history} riskScore={doneResult.risk_score} />
+            <div className="mt-6">
+              <InterventionPanel plan={doneResult.interventions} />
+            </div>
           </div>
         )}
       </main>
