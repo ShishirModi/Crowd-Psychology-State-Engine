@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import NavBar from '@/components/NavBar'
 import { analyze, pollResult } from '@/lib/api'
@@ -26,30 +26,40 @@ export default function DashboardPage() {
   const [taskId, setTaskId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [authChecked, setAuthChecked] = useState(false)
 
   useEffect(() => {
-    if (!localStorage.getItem('cpse_user')) router.push('/login')
+    if (!localStorage.getItem('cpse_user')) {
+      router.push('/login')
+    } else {
+      setAuthChecked(true)
+    }
   }, [router])
 
   useEffect(() => {
     if (!taskId) return
-    pollRef.current = setInterval(async () => {
+    let cancelled = false
+    const id = setInterval(async () => {
       try {
         const r = await pollResult(taskId)
+        if (cancelled) return
         if (r.status === 'done') {
           setResult(r)
           setLoading(false)
-          clearInterval(pollRef.current!)
+          clearInterval(id)
           setTaskId(null)
         }
       } catch {
-        clearInterval(pollRef.current!)
+        if (cancelled) return
+        clearInterval(id)
         setError('Polling failed — result may not be available')
         setLoading(false)
       }
     }, POLL_INTERVAL)
-    return () => clearInterval(pollRef.current!)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+    }
   }, [taskId])
 
   async function handleAnalyze() {
@@ -65,6 +75,8 @@ export default function DashboardPage() {
   }
 
   const doneResult = result && isDone(result) ? result : null
+
+  if (!authChecked) return null
 
   return (
     <div className="min-h-screen bg-slate-50">
