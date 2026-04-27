@@ -32,3 +32,4 @@ frontend/.env.local
 # Misc
 .claude/
 .mcp.json
+CLAUDE.md

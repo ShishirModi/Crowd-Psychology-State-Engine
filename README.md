@@ -7,15 +7,20 @@ Real-time crowd dynamics classification and risk analysis. CPSE ingests aggregat
 ## Architecture
 
 ```
-Browser (Next.js)
-    │  POST /analyze  →  GET /result/{task_id}  (polling)
-    │  session cookie
-Django + DRF
-    │  enqueue
-Celery Worker  ──writes──▶  Redis (results, state, weather cache)
-    │  ORM
-Supabase (PostgreSQL)   crowd_telemetry · analysis_task
+Browser / Cloudflare Tunnel
+        │  HTTPS → :3000
+  Next.js (public)
+        │  server-side rewrites for API paths
+        │  /auth/*  /analyze  /result/*  /history  /latest
+  Django :8000 (localhost only, never exposed)
+        │  enqueue
+  Celery Worker ──writes──▶ Redis (results · state · weather cache)
+        │  ORM
+  Supabase (PostgreSQL)   crowd_telemetry · analysis_task
 ```
+
+`app.py` at the project root manages both Django and Next.js as subprocesses.
+Cloudflare Tunnel points to port 3000 only.
 
 Full diagram: [`ARCHITECTURE.md`](ARCHITECTURE.md)
 
@@ -25,12 +30,13 @@ Full diagram: [`ARCHITECTURE.md`](ARCHITECTURE.md)
 
 | Layer | Technology |
 |---|---|
+| Entry point | `app.py` — subprocess manager (Django + Next.js) |
 | Frontend | Next.js 16, TypeScript, Tailwind CSS, recharts |
 | Backend | Django 4.2, Django REST Framework |
 | Async | Celery 5, Redis |
 | Database | Supabase (PostgreSQL via `psycopg2`) |
 | Auth | Django session auth, seeded from `APP_PASSWORD` |
-| Deployment | Gunicorn + Celery systemd units, Cloudflare Tunnel |
+| Deployment | `app.py` (dev) · Gunicorn + `next start` systemd units (prod), Cloudflare Tunnel → :3000 |
 
 ---
 
@@ -59,42 +65,61 @@ Full diagram: [`ARCHITECTURE.md`](ARCHITECTURE.md)
 
 ```bash
 cp .env.example .env
-# fill in SUPABASE_DB_URL, REDIS_URL, DJANGO_SECRET_KEY, API keys
+# fill in SUPABASE_DB_URL, REDIS_URL, DJANGO_SECRET_KEY, APP_PASSWORD, API keys
 ```
 
-### 2. Backend
+### 2. Install dependencies
 
 ```bash
+# Backend
 cd backend
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 python manage.py migrate
 python manage.py seed_users   # creates users from APP_PASSWORD
-python manage.py runserver    # http://localhost:8000
+
+# Frontend
+cd ../frontend
+npm install
 ```
 
-### 3. Celery worker (separate terminal)
+### 3. Start everything
 
 ```bash
-cd backend
-source venv/bin/activate
+# From project root (development)
+python app.py
+```
+
+This starts Django on `:8000` (internal) and Next.js on `:3000` (public).
+Open `http://localhost:3000` → log in → run an analysis.
+
+### 4. Celery worker (separate terminal)
+
+```bash
+cd backend && source venv/bin/activate
 celery -A core worker --loglevel=info
 ```
 
-### 4. Frontend
+### Running components separately
+
+If you prefer to run without `app.py`:
 
 ```bash
-cd frontend
-npm install
-# create frontend/.env.local with: NEXT_PUBLIC_API_URL=http://localhost:8000
-npm run dev   # http://localhost:3000
+# Django
+cd backend && python manage.py runserver
+
+# Next.js (in another terminal)
+cd frontend && npm run dev
 ```
 
-Open `http://localhost:3000` → log in → run an analysis.
+When running separately, add `DJANGO_INTERNAL_URL=http://localhost:8000` to
+`frontend/.env.local` so Next.js rewrites can reach Django.
 
 ---
 
 ## API
+
+All paths below are served through Next.js rewrites — the browser never connects directly to Django.
 
 | Method | Path | Description |
 |---|---|---|
@@ -110,25 +135,27 @@ Open `http://localhost:3000` → log in → run an analysis.
 ## Project Structure
 
 ```
+app.py                  ← single entry point: starts Django + Next.js
 backend/
-├── core/           Django project (settings, urls, wsgi, celery)
-├── api/            DRF views, serializers, auth
-├── auth_app/       login/logout + seed_users command
-├── tasks/          analyze_crowd Celery task
-├── cache/          Redis key helpers, state serialization
-├── models/         CrowdTelemetry (unmanaged), AnalysisTask ORM
+├── core/               Django project (settings/, urls.py, wsgi.py, celery.py)
+├── api/                DRF views, serializers, auth
+├── auth_app/           login/logout + seed_users management command
+├── tasks/              analyze_crowd Celery task
+├── cache/              Redis key helpers, state serialization
+├── models/             CrowdTelemetry (unmanaged), AnalysisTask ORM
 └── services/
-    ├── signals/    tomtom.py · weather.py · geocoder.py
-    ├── metrics/    compression.py
-    ├── engine/     classifier.py · anomaly.py
+    ├── signals/        tomtom.py · weather.py · geocoder.py
+    ├── metrics/        compression.py
+    ├── engine/         classifier.py · anomaly.py
     ├── interventions/  recommender.py
-    └── data_layer/ vectorizer.py · database.py
+    └── data_layer/     vectorizer.py · database.py
 
 frontend/
-├── app/            login/ · dashboard/ · history/
-├── components/     NavBar · StateBanner · RiskBar · MetricsGrid
-│                   Charts · InterventionPanel
-└── lib/            types.ts · api.ts
+├── next.config.ts      API rewrites → Django internal URL
+├── app/                login/ · dashboard/ · history/
+├── components/         NavBar · StateBanner · RiskBar · MetricsGrid
+│                       Charts · InterventionPanel
+└── lib/                types.ts · api.ts (relative-URL fetch client)
 ```
 
 ---
@@ -147,12 +174,23 @@ frontend/
 
 ## Configuration
 
-`config.yaml` at project root controls API endpoints, simulation parameters, and metric thresholds. The backend loads it at startup via `backend/utils/config_loader.py`.
+`config.yaml` at project root controls API endpoints, simulation parameters, and metric
+thresholds. The backend loads it at startup via `backend/utils/config_loader.py`.
 
 ---
 
 ## Deployment
 
-Production: Gunicorn serves Django; Celery runs as a systemd service; Cloudflare Tunnel (`cloudflared tunnel run cpse`) exposes both without opening firewall ports.
+```bash
+# Production mode — Gunicorn + next start
+APP_ENV=prod python app.py
+```
+
+Or as separate systemd units (Gunicorn, Celery, Next.js), with Cloudflare Tunnel
+pointing to `http://localhost:3000`.
+
+```bash
+cloudflared tunnel run cpse
+```
 
 See `ARCHITECTURE.md` for the full deployment section.

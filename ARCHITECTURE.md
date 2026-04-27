@@ -6,51 +6,111 @@
 ## System Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        BROWSER (Next.js)                        │
-│  Login → Dashboard → POST /analyze → poll /result/{task_id}     │
-└────────────────────────────┬────────────────────────────────────┘
-                             │ HTTP + session cookie
-┌────────────────────────────▼────────────────────────────────────┐
-│                      DJANGO + DRF                               │
-│  auth_app/   api/   → enqueues Celery task, serves results      │
-└──────────┬───────────────────────────────────┬──────────────────┘
-           │ task dispatch                     │ Redis reads
-┌──────────▼──────────┐             ┌──────────▼──────────────────┐
-│    CELERY WORKER    │             │           REDIS              │
-│  analyze_crowd()    │────writes──▶│  result:{id}  state:{loc}   │
-│  full pipeline      │             │  last:{loc}   weather:{...} │
-└──────────┬──────────┘             └─────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                         BROWSER                                      │
+│  Login → Dashboard → POST /analyze → poll /result/{task_id}          │
+└──────────────────────────────┬───────────────────────────────────────┘
+                               │ HTTPS (Cloudflare Tunnel)
+┌──────────────────────────────▼───────────────────────────────────────┐
+│                    NEXT.JS  :3000  (public)                          │
+│  pages: login · dashboard · history                                  │
+│  server-side rewrites:                                               │
+│    /auth/*  /analyze  /result/*  /history  /latest  → Django :8000  │
+└──────────────────────────────┬───────────────────────────────────────┘
+                               │ HTTP (localhost only)
+┌──────────────────────────────▼───────────────────────────────────────┐
+│                    DJANGO + DRF  :8000  (internal)                   │
+│  auth_app/   api/   → enqueues Celery task, serves results           │
+└──────────┬────────────────────────────────┬─────────────────────────┘
+           │ task dispatch                  │ Redis reads
+┌──────────▼──────────┐          ┌──────────▼──────────────────────────┐
+│    CELERY WORKER    │          │              REDIS                   │
+│  analyze_crowd()    │──writes─▶│  result:{id}   state:{loc}          │
+│  full pipeline      │          │  last:{loc}    weather:{lat}:{lon}  │
+└──────────┬──────────┘          └─────────────────────────────────────┘
            │ ORM write
-┌──────────▼──────────────────────────────────────────────────────┐
-│                  SUPABASE (PostgreSQL)                          │
-│          crowd_telemetry        analysis_task                   │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────▼──────────────────────────────────────────────────────────┐
+│                    SUPABASE (PostgreSQL)                             │
+│            crowd_telemetry          analysis_task                   │
+└─────────────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Entry Point — `app.py`
+
+`app.py` at the project root is the single command to start the whole application.
+
+```
+python app.py              # development  (manage.py runserver + next dev)
+APP_ENV=prod python app.py # production   (gunicorn + next start)
+```
+
+It:
+- Spawns Django as a subprocess on `DJANGO_PORT` (default 8000, localhost-bound)
+- Spawns Next.js as a subprocess on `PORT` (default 3000, public)
+- Streams both process logs with `[django]` / `[nextjs]` prefixes
+- Shuts both down cleanly on SIGINT / SIGTERM
+- Exits if either process dies unexpectedly
+
+**Environment variables consumed by `app.py`:**
+
+| Variable | Default | Effect |
+|---|---|---|
+| `APP_ENV` | `dev` | `dev` = runserver + next dev; `prod` = gunicorn + next start |
+| `DJANGO_PORT` | `8000` | Internal Django port |
+| `PORT` | `3000` | Next.js public port (forwarded to Cloudflare Tunnel) |
+| `GUNICORN_WORKERS` | `3` | Worker count in prod mode |
+
+`app.py` injects `DJANGO_INTERNAL_URL=http://localhost:{DJANGO_PORT}` into the Next.js
+process environment so `next.config.ts` rewrites can reach Django.
 
 ---
 
 ## Request Lifecycle
 
 ```
-Client                Django              Redis           Celery Worker         Supabase
-  │                     │                   │                  │                    │
-  │── POST /analyze ───▶│                   │                  │                    │
-  │                     │── enqueue task ──▶│                  │                    │
-  │◀─ { task_id } ──────│                   │                  │                    │
-  │                     │                   │◀── pick up ──────│                    │
-  │── GET /result/{id} ▶│                   │                  │                    │
-  │◀─ { status: pending}│                   │   load state ───▶│                    │
-  │   (poll every 2s)   │                   │◀─ state blob ────│                    │
-  │                     │                   │                  │── run pipeline ──▶ │
-  │                     │                   │                  │◀─ (ok) ───────────│
-  │                     │                   │◀─ write result ──│                    │
-  │                     │                   │◀─ write state ───│                    │
-  │── GET /result/{id} ▶│                   │                  │                    │
-  │                     │── read result ───▶│                  │                    │
-  │◀─ { status: done,   │◀─ result JSON ────│                  │                    │
-  │    payload: {...} } │                   │                  │                    │
+Client              Next.js             Django              Redis         Celery          Supabase
+  │                    │                   │                  │              │                │
+  │── POST /analyze ──▶│                   │                  │              │                │
+  │   (rewrite) ───────┼──▶ POST /analyze ▶│                  │              │                │
+  │                    │                   │── enqueue task ──▶│              │                │
+  │◀─ { task_id } ─────┼──────────────────◀│                  │              │                │
+  │                    │                   │                  │◀── pick up ──│                │
+  │── GET /result ─────┼──▶ GET /result ──▶│                  │              │                │
+  │◀─ { pending } ─────┼──────────────────◀│   load state ────┼─────────────▶│                │
+  │   (poll 2s)        │                   │◀─ state blob ────┼─────────────◀│                │
+  │                    │                   │                  │              │── pipeline ───▶│
+  │                    │                   │                  │◀─ write result ──────────────◀│
+  │                    │                   │                  │◀─ write state ───────────────◀│
+  │── GET /result ─────┼──▶ GET /result ──▶│                  │              │                │
+  │                    │                   │── read result ───▶│              │                │
+  │◀─ { done, payload }┼──────────────────◀│◀─ result JSON ───│              │                │
 ```
+
+---
+
+## Next.js Proxy — `next.config.ts`
+
+Next.js rewrites act as a transparent server-side proxy. The browser makes all requests
+to the same origin (`:3000`); Next.js forwards them internally to Django (`:8000`).
+This means:
+
+- **Single port exposed** — Cloudflare Tunnel points only to `:3000`
+- **No CORS** — browser never makes cross-origin requests to Django
+- **Session cookies** — `Set-Cookie` headers from Django are forwarded to the browser
+  transparently; the browser sends them back on each request, and Next.js forwards them
+  to Django
+
+Rewrite rules (set in `next.config.ts`, destination resolved from `DJANGO_INTERNAL_URL`):
+
+| Source | Destination |
+|---|---|
+| `/auth/:path*` | `http://localhost:8000/auth/:path*` |
+| `/analyze` | `http://localhost:8000/analyze` |
+| `/result/:path*` | `http://localhost:8000/result/:path*` |
+| `/history` | `http://localhost:8000/history` |
+| `/latest` | `http://localhost:8000/latest` |
 
 ---
 
@@ -60,6 +120,9 @@ Client                Django              Redis           Celery Worker         
 Django project package. Contains `settings/`, `urls.py`, `wsgi.py`, `celery.py`.
 Settings split into `base.py` (shared), `dev.py` (DEBUG=True, SQLite allowed),
 `prod.py` (Gunicorn, ALLOWED_HOSTS, secure cookies).
+
+`prod.py` always includes `localhost` and `127.0.0.1` in `ALLOWED_HOSTS` so the
+Next.js rewrite proxy can reach Django without additional configuration.
 
 ---
 
@@ -101,8 +164,8 @@ DRF views and serializers. No business logic — thin adapter between HTTP and s
   "gradient": 0.491,
   "velocity_var": 0.18,
   "anomaly_score": 1.2,
-  "breakdown": { ... },
-  "interventions": { ... }
+  "breakdown": { "...": "..." },
+  "interventions": { "...": "..." }
 }
 ```
 
@@ -146,7 +209,7 @@ analyze_crowd(lat, lon, location_name, env_params, task_id)
     ├─ 11. CrowdTelemetry.objects.create(...)            ← Supabase write
     │
     └─ 12. store_result(task_id, location_name, payload) ← Redis: cpse:result:{task_id}
-                                                                    cpse:last:{location}
+                                                                   cpse:last:{location}
 ```
 
 ---
@@ -161,8 +224,9 @@ Owns all Redis key patterns and state serialization.
 |---|---|---|
 | `cpse:result:{task_id}` | 1h | Full result JSON (string) |
 | `cpse:last:{location}` | 24h | Latest result JSON for location |
-| `cpse:state:{location}` | 24h | Pickled `CrowdMetrics` + `AnomalyDetector` state |
+| `cpse:state:{location}` | 24h | Serialized CrowdMetrics + AnomalyDetector state |
 | `cpse:weather:{lat}:{lon}` | 10m | Cached OpenWeatherMap response |
+| `cpse:lock:{location}` | 30s | Per-location concurrency lock |
 
 **State serialization:** `CrowdMetrics` exposes `congestion_history` and `speed_history`
 as `deque` objects. `AnomalyDetector` exposes `history` as `deque` and `_cycle` as int.
@@ -177,8 +241,7 @@ location from racing on state writes.
 
 ### `backend/services/` — Service Classes
 
-All service classes are ported from the existing codebase with **no logic changes**
-during migration. They are plain Python — no Django or Celery imports.
+All service classes are plain Python — no Django or Celery imports.
 
 #### `signals/tomtom.py` — `TomTomSignal`
 Fetches traffic flow data from TomTom Flow Segment API.
@@ -194,7 +257,7 @@ Falls back to `_simulate_telemetry()` when API key absent or request fails.
 
 #### `signals/weather.py` — `OpenWeatherMapSignal`
 Fetches current weather and maps OWM condition code to a risk float [0.0, 1.0].
-Cache moves from `@st.cache_data` (Streamlit) to Redis key `cpse:weather:{lat}:{lon}` (TTL 10m).
+Cached in Redis at `cpse:weather:{lat}:{lon}` (TTL 10m).
 
 | OWM Group | Risk |
 |---|---|
@@ -210,8 +273,7 @@ Cache moves from `@st.cache_data` (Streamlit) to Redis key `cpse:weather:{lat}:{
 | 80x Clouds | 0.1 |
 
 #### `signals/geocoder.py` — `TomTomGeocoder`
-Wraps TomTom Search API. Used by the frontend location search only. Reuses the
-same `TOMTOM_API_KEY`. Returns `[{ name, lat, lon }]`.
+Wraps TomTom Search API. Used by the frontend location search. Returns `[{ name, lat, lon }]`.
 
 #### `metrics/compression.py` — `CrowdMetrics`
 Maintains a 12-sample rolling window (≈60s at 5s intervals).
@@ -295,8 +357,7 @@ Celery workers use the pooler URL (Transaction mode) to avoid exhausting connect
 ### `backend/models/`
 
 #### `CrowdTelemetry`
-Maps to existing `crowd_telemetry` table. Django ORM with `managed=False` to avoid
-re-creating the table (schema already exists in Supabase).
+Maps to existing `crowd_telemetry` table. `managed=False` — schema owned by Supabase.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -315,7 +376,7 @@ re-creating the table (schema already exists in Supabase).
 | session_id | TEXT | nullable |
 
 #### `AnalysisTask`
-New table. Tracks task lifecycle and optionally snapshots the result.
+Tracks task lifecycle and optionally snapshots the result for Redis cold-start recovery.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -332,9 +393,9 @@ New table. Tracks task lifecycle and optionally snapshots the result.
 ```
 app/
 ├── login/page.tsx
-│     POST /auth/login → set session cookie → redirect /
+│     POST /auth/login → session cookie → redirect /dashboard
 │
-├── page.tsx (Dashboard)
+├── dashboard/page.tsx
 │     ├── useAnalysis() hook
 │     │     POST /analyze → task_id
 │     │     poll GET /result/{task_id} every 2s until status=done
@@ -342,22 +403,22 @@ app/
 │     ├── <StateBanner state confidence summary />
 │     ├── <RiskBar score />
 │     ├── <MetricsGrid congestion gradient velocityVar anomalyScore />
-│     ├── <EnvironmentPanel weather width event />
 │     ├── <Charts history />         ← recharts LineChart / AreaChart
-│     ├── <InterventionPanel plan />
-│     └── <LocationMap lat lon />    ← react-leaflet or next/image static map
+│     └── <InterventionPanel plan />
 │
 └── history/page.tsx
       GET /history?location=&limit=&anomaly_only=
       ├── <FilterBar />
       ├── <KPIRow totalRecords avgCongestion anomalies dominantState />
-      ├── <TrendChart />             ← only for single-location filter
+      ├── <TrendChart />             ← single-location filter only
       └── <DataTable />
 ```
 
 **API client (`lib/api.ts`):**
-Typed wrapper around `fetch`. Sends credentials (session cookie) on all requests.
-Throws on non-2xx. Exposes: `login`, `logout`, `analyze`, `pollResult`, `getHistory`, `getLatest`.
+Typed wrapper around `fetch`. Uses relative URLs (BASE defaults to `''`) so all requests
+go to the same Next.js origin and are proxied to Django by `next.config.ts` rewrites.
+Sends `credentials: 'include'` on all requests for session cookie forwarding.
+Exposes: `login`, `logout`, `analyze`, `pollResult`, `getHistory`, `getLatest`.
 
 ---
 
@@ -377,7 +438,17 @@ REDIS_URL=
 TOMTOM_API_KEY=
 OPENWEATHERMAP_API_KEY=
 APP_PASSWORD=                # first entry = admin, rest = viewer
+ALLOWED_HOSTS=               # comma-separated hostnames for prod Django
 ```
+
+**`frontend/.env.local`** — Next.js local overrides. Not committed.
+
+```
+DJANGO_INTERNAL_URL=http://localhost:8000   # consumed server-side by next.config.ts rewrites
+```
+
+When running via `app.py`, `DJANGO_INTERNAL_URL` is injected automatically and
+`frontend/.env.local` is not required.
 
 ---
 
@@ -412,6 +483,38 @@ analyze_crowd (Celery task)
 
 ---
 
+## Deployment
+
+### Development
+
+```bash
+python app.py
+```
+
+### Production (systemd)
+
+Three systemd units: `cpse-web` (Next.js via `next start`), `cpse-django` (Gunicorn),
+`cpse-worker` (Celery). Or run all via `APP_ENV=prod python app.py` for simpler setups.
+
+Cloudflare Tunnel config (`~/.cloudflared/config.yml`):
+
+```yaml
+tunnel: cpse
+ingress:
+  - hostname: cpse.example.com
+    service: http://localhost:3000   # Next.js only — Django stays internal
+  - service: http_status:404
+```
+
+```bash
+cloudflared tunnel run cpse
+```
+
+Django is never reachable from outside the server — all external traffic goes through
+Next.js (`:3000`), which proxies API calls to Django (`:8000`) server-side.
+
+---
+
 ## Python Packages
 
 | Package | Role |
@@ -420,7 +523,7 @@ analyze_crowd (Celery task)
 | `djangorestframework` | API layer |
 | `celery[redis]` | async task queue |
 | `redis` | Redis client |
-| `django-cors-headers` | CORS for Next.js dev origin |
+| `django-cors-headers` | CORS (retained for dev flexibility) |
 | `psycopg2-binary` | PostgreSQL driver (Supabase) |
 | `requests` | TomTom + OWM HTTP calls |
 | `numpy` | metrics and anomaly math |
@@ -428,14 +531,13 @@ analyze_crowd (Celery task)
 | `python-dotenv` | .env loading |
 | `timezonefinder`, `pytz` | local time for telemetry timestamps |
 
-**Removed:** `streamlit`, `plotly`, `pandas` (moved to frontend)
+**Removed:** `streamlit`, `plotly`, `pandas`
 
 ## Node Packages (frontend)
 
 | Package | Role |
 |---|---|
-| `next` | React framework + routing |
+| `next` | React framework + routing + server-side rewrites |
 | `react`, `react-dom` | UI |
 | `recharts` | charts (replaces Plotly) |
-| `react-leaflet` | location map |
 | `tailwindcss` | styling |
