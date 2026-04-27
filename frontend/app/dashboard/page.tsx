@@ -6,6 +6,8 @@ import NavBar from '@/components/NavBar'
 import StateBanner from '@/components/StateBanner'
 import RiskBar from '@/components/RiskBar'
 import MetricsGrid from '@/components/MetricsGrid'
+import Charts from '@/components/Charts'
+import type { HistoryPoint } from '@/components/Charts'
 import { analyze, pollResult } from '@/lib/api'
 import type { AnalyzeParams, PollResponse, AnalysisResult } from '@/lib/types'
 
@@ -30,6 +32,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [authChecked, setAuthChecked] = useState(false)
+  const [history, setHistory] = useState<HistoryPoint[]>([])
 
   useEffect(() => {
     if (!localStorage.getItem('cpse_user')) {
@@ -48,6 +51,17 @@ export default function DashboardPage() {
         if (cancelled) return
         if (r.status === 'done') {
           setResult(r)
+          setHistory(prev => {
+            const point: HistoryPoint = {
+              time: r.timestamp,
+              congestion: r.congestion,
+              gradient: r.gradient,
+              velocity_var: r.velocity_var,
+              anomaly_score: r.anomaly_score,
+              state: r.state,
+            }
+            return [...prev.slice(-59), point]
+          })
           setLoading(false)
           clearInterval(id)
           setTaskId(null)
@@ -191,6 +205,7 @@ export default function DashboardPage() {
               formula={doneResult.breakdown.risk_score?.formula}
             />
             <MetricsGrid result={doneResult} />
+            <Charts history={history} riskScore={doneResult.risk_score} />
           </div>
         )}
       </main>
