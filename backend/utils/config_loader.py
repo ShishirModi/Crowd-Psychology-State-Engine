@@ -9,6 +9,8 @@ _config = None
 
 def load_config(path=None) -> dict:
     global _config
+    if path is None and _config is not None:
+        return _config
     resolved = Path(path) if path else _CONFIG_PATH
     if not resolved.exists():
         print(f"Config file not found at {resolved}, using defaults.")

@@ -137,6 +137,28 @@ class SupabaseDatabaseManager:
             self._connected = False
             self._status = f"Write error: {exc}"
 
+    def fetch_history(self, location_name: str, limit: int = 50) -> list:
+        if not self._connected:
+            return []
+        try:
+            with self._cursor(dict_cursor=True) as cur:
+                cur.execute(f"""
+                    SELECT * FROM (
+                        SELECT * FROM {_TABLE}
+                        WHERE  location_name = %s
+                        ORDER  BY created_at DESC
+                        LIMIT  %s
+                    ) sub
+                    ORDER BY created_at ASC
+                """, (location_name, limit))
+                return [dict(r) for r in cur.fetchall()]
+        except Exception as exc:
+            log.error(f"fetch_history failed: {exc}")
+            return []
+
+    def fetch_recent_logs(self, limit: int = 100) -> list:
+        return self.fetch_filtered_logs(limit=limit)
+
     def fetch_filtered_logs(
         self,
         limit: int = 100,

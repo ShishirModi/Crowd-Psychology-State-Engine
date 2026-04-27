@@ -41,8 +41,13 @@ class OpenWeatherMapSignal:
     def __init__(self):
         config = get_config()
         weather_config = config.get('api', {}).get('openweathermap', {})
-        env_var = weather_config.get('env_key_name', 'OPENWEATHERMAP_API_KEY')
-        self.api_key = os.getenv(env_var)
+        self.api_key = None
+        if weather_config.get('use_env_key'):
+            env_var = weather_config.get('env_key_name')
+            if env_var:
+                self.api_key = os.getenv(env_var)
+        if not self.api_key:
+            self.api_key = weather_config.get('key')
         self.base_url = weather_config.get(
             'base_url', 'https://api.openweathermap.org/data/2.5/weather'
         )
