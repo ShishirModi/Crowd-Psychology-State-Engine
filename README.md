@@ -1,189 +1,196 @@
-# Crowd Psychology State Engine (CPSE) — v2.0
+# Crowd Psychology State Engine (CPSE)
 
-## Project Overview
-
-The **Crowd Psychology State Engine (CPSE)** is a modular, real-time analytical system that infers the psychological and physical state of a crowd using non-identifying, privacy-preserving environmental signals. Rather than relying on invasive facial recognition or surveillance cameras, CPSE processes aggregate telemetry — traffic flows, congestion indices, weather patterns, and environmental constraints — to compute physical crowd dynamics. It identifies early indicators of crowd-crush risks, turbulence, and agitation, and delivers structured, severity-graded intervention plans for safety personnel.
-
-CPSE is designed for deployment on **Streamlit Community Cloud** and features an enterprise-grade dark-theme dashboard with real-time monitoring, composite risk scoring, per-metric criteria breakdowns, and an administrative database viewer.
-
----
-
-## Key Features
-
-### Real-Time Signal Fusion
-CPSE ingests data from the **TomTom Traffic Flow API** and **OpenWeatherMap API** with automatic fallback to high-fidelity stochastic simulation when API keys are unavailable. The system recalculates every telemetry cycle (configurable, default 30 seconds) and persists results to **Neon PostgreSQL** for long-term trend analysis.
-
-### Physics-Based Crowd Metrics with Full Diagnostics
-Two primary metrics drive classification, each returning a detailed sub-metric breakdown for transparency:
-
-- **Compression Gradient**: Combines current density level (60% weight) with the slope of a least-squares linear regression over a 60-second rolling window (40% weight). Returns R² fit quality, slope per sample, slope per minute, trend direction (Rising/Falling/Flat), and a plain-language verdict.
-- **Velocity Variance (Coefficient of Variation)**: Detects stop-and-go shockwaves by computing σ(speed)/μ(speed) over the speed history buffer. Returns mean speed, standard deviation, speed range, and a turbulence-level classification (Negligible, Mild, Moderate, Severe).
-
-### Multi-Factor State Classification with Breakdown
-The classifier evaluates compression gradient, velocity variance, anomaly score, and environmental conditions to produce one of five crowd states: **Stable**, **Compressing**, **Volatile**, **Agitated**, or **Fragmenting**. Each classification returns a rich `breakdown` dictionary containing per-factor verdicts, threshold comparisons, and color-coded ratings (`safe`, `watch`, `warning`, `critical`).
-
-The classifier also produces a **Composite Risk Score (0–100)** using the weighted formula:
-
-```
-Risk = 0.35 × Gradient + 0.25 × Variance + 0.20 × Anomaly + 0.20 × Environment
-```
-
-### Statistical Anomaly Detection with Per-Feature Diagnostics
-A rolling Z-Score profiler maintains a 100-sample history window. Once calibrated (20+ samples), it computes per-feature Z-Scores across the crowd state vector `[density, turbulence, pressure, time_factor]` and flags features exceeding the 2.5σ threshold. The UI displays a per-feature bar chart and detail table showing each feature's current value, baseline mean, baseline σ, Z-Score, and outlier status.
-
-### Structured Intervention Plans
-The recommender maps each crowd state to a tiered response plan. Each action includes a priority level (Critical, High, Medium, Low), a responsible party (Incident Commander, Crowd Control, Gate Teams, etc.), and an expected outcome. The dashboard renders these as priority-colored cards with an overall response-level badge (ROUTINE, ADVISORY, URGENT, EMERGENCY, CAUTION).
-
-### Enterprise-Grade Dashboard
-The Streamlit frontend uses a custom dark-theme design system built on the Inter typeface with a slate color palette. Key UI components include:
-
-- **State banner** with gradient background, state label, description, and confidence percentage
-- **Composite risk bar** with gradient fill and real-time severity verdict
-- **Criteria panels** beside every metric showing thresholds, formulas, current values, and plain-language verdicts — color-coded by severity
-- **Dual-panel Plotly charts** (density/compression + turbulence/anomaly) with threshold reference lines
-- **Gauge dial** for composite risk score with color-graded zones
-- **Donut chart** showing state distribution over the monitoring session
-- **Per-feature anomaly bar chart** with outlier highlighting
-- **Intervention cards** with priority, owner, and outcome metadata
-- **Confidence breakdown expander** listing all penalties and bonuses applied
-
-### Secure Telemetry Persistence
-All telemetry streams to **Neon PostgreSQL** utilizing connection pooling for optimal real-time performance. An admin dashboard provides filtered querying by location, record limit, and anomaly-only mode, with CSV export and professional Plotly trend charts.
-
-### Privacy-by-Design
-CPSE captures only aggregate macro-flows. No personally identifiable information (PII) or individualized tracking metrics are collected or retained. All classifications are produced by transparent, explainable rule-based logic.
+Real-time crowd dynamics classification and risk analysis. CPSE ingests aggregate telemetry — traffic flows, congestion indices, and weather — to compute crowd state, anomaly scores, composite risk, and structured intervention plans. No PII, no cameras.
 
 ---
 
 ## Architecture
 
 ```
-Crowd-Psychology-State-Engine/
-├── app.py                      # Streamlit enterprise dashboard (main entry point)
-├── main.py                     # CLI fallback for headless monitoring
-├── config.yaml                 # API keys, thresholds, location defaults
-├── requirements.txt            # Python dependencies
-│
-├── signals/                    # External API adapters
-│   ├── tomtom.py               #   TomTom Traffic Flow API client
-│   ├── weather.py              #   OpenWeatherMap integration
-│   └── geocoder.py             #   TomTom Search geocoding
-│
-├── metrics/                    # Physics-based metric computation
-│   └── compression.py          #   Compression gradient + velocity variance
-│
-├── engine/                     # Core analysis logic
-│   ├── classifier.py           #   Multi-factor state classifier with breakdown
-│   ├── anomaly.py              #   Z-Score anomaly detector with per-feature diagnostics
-│   └── models/
-│       └── gnn_stub.py         #   Graph Neural Network placeholder (future)
-│
-├── data_layer/                 # Persistence & vectorization
-│   ├── database.py             #   Neon PostgreSQL client
-│   └── vectorizer.py           #   State & environmental vector creation
-│
-├── interventions/              # Response planning
-│   └── recommender.py          #   Severity-graded intervention recommender
-│
-├── utils/                      # Shared utilities
-│   ├── config_loader.py        #   YAML config loader with caching
-│   ├── security.py             #   API key redaction
-│   └── time_helper.py          #   Timezone-aware time formatting
-│
-├── tests/                      # Unit tests (15 tests)
-│   ├── test_classifier.py      #   Classifier states, overrides, breakdown structure
-│   ├── test_metrics.py         #   Gradient computation, velocity variance, details
-│   └── test_vectorizer.py      #   Vector shape and normalization
-│
-├── scripts/                    # Database setup
-│   ├── db_setup.sql            #   PostgreSQL schema creation
-│   ├── harden_db.sql           #   Row-level security hardening
-│   └── check_db.py             #   Database validation
-│
-└── documents/                  # Extended documentation
-    ├── phase_plan.md           #   Development roadmap
-    ├── metrics.md              #   Metric definitions & formulas
-    ├── database.md             #   Database architecture
-    ├── deployment.md           #   Deployment instructions
-    └── security.md             #   Security & privacy design
+Browser / Cloudflare Tunnel
+        │  HTTPS → :3000
+  Next.js (public)
+        │  server-side rewrites for API paths
+        │  /auth/*  /analyze  /result/*  /history  /latest
+  Django :8000 (localhost only, never exposed)
+        │  enqueue
+  Celery Worker ──writes──▶ Redis (results · state · weather cache)
+        │  ORM
+  Supabase (PostgreSQL)   crowd_telemetry · analysis_task
 ```
+
+`app.py` at the project root manages both Django and Next.js as subprocesses.
+Cloudflare Tunnel points to port 3000 only.
+
+Full diagram: [`ARCHITECTURE.md`](ARCHITECTURE.md)
 
 ---
 
-## Setup & Installation
+## Stack
 
-### 1. Requirements
-
-Python 3.9+ is required. Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-### 2. Configuration & Secrets
-
-Create a `.streamlit/secrets.toml` file or set the following as environment variables:
-
-```toml
-TOMTOM_API_KEY = "your_tomtom_traffic_api_key"
-OPENWEATHERMAP_API_KEY = "your_openweathermap_api_key"
-APP_PASSWORD = ["admin_password", "viewer_password"]
-NEON_PASS = "your_neon_db_password"
-```
-
-The first password in `APP_PASSWORD` grants Admin Console access (database viewer). Subsequent passwords provide standard monitoring access. If no password is configured, the system defaults to `cpseisawesome` for local development.
-
-All API keys are optional — the system falls back to simulation mode when keys are missing, with a confidence penalty clearly shown in the dashboard.
-
-### 3. Running the Application
-
-**Web Dashboard** (primary):
-```bash
-streamlit run app.py
-```
-
-**CLI Mode** (headless monitoring):
-```bash
-python main.py
-```
-
-### 4. Running Tests
-
-CPSE ships with 15 unit tests covering the classifier, metrics engine, and vectorizer:
-
-```bash
-python -m unittest discover tests -v
-```
+| Layer | Technology |
+|---|---|
+| Entry point | `app.py` — subprocess manager (Django + Next.js) |
+| Frontend | Next.js 16, TypeScript, Tailwind CSS, recharts |
+| Backend | Django 4.2, Django REST Framework |
+| Async | Celery 5, Redis |
+| Database | Supabase (PostgreSQL via `psycopg2`) |
+| Auth | Django session auth, seeded from `APP_PASSWORD` |
+| Deployment | `app.py` (dev) · Gunicorn + `next start` systemd units (prod), Cloudflare Tunnel → :3000 |
 
 ---
 
 ## Crowd States
 
-| State | Severity | Trigger | Response Level |
-|---|---|---|---|
-| **Stable** | 0 | Gradient < 0.1 | ROUTINE |
-| **Compressing** | 1 | 0.5 ≤ Gradient < 0.8 | ADVISORY |
-| **Volatile** | 2 | Gradient ≥ 0.8, or Compressing + high turbulence | URGENT |
-| **Agitated** | 3 | Gradient > 0.95, or Volatile + high turbulence | EMERGENCY |
-| **Fragmenting** | 2 | Rapid gradient drop (Δ < −0.3) from elevated state | CAUTION |
-
-The classifier applies velocity variance overrides (CV > 0.25 escalates one severity tier) and anomaly overrides (Z > 2.5 appends an anomaly flag). Environmental modifiers — adverse weather, narrow passages, and active events — can further escalate Compressing into Volatile when their combined penalty exceeds 0.1.
+| State | Description |
+|---|---|
+| **Stable** | Normal flow, low density gradient, calm |
+| **Compressing** | Density rising, compression gradient climbing |
+| **Volatile** | High velocity variance — stop-and-go shockwaves |
+| **Agitated** | Multi-factor alert; anomaly + compression + turbulence |
+| **Fragmenting** | Dispersal pattern — crowd splitting into streams |
 
 ---
 
-## Design Philosophy
+## Quick Start
 
-- **Anti-Surveillance**: The system uses only aggregate macro-flows. Individual identities do not exist in the CPSE data domain.
-- **Explainability**: Every classification comes with a full breakdown — thresholds used, formulas applied, penalties assessed, and plain-language verdicts. Safety decisions require transparency.
-- **Advisory Only**: CPSE provides structured recommendations to human operators. It does not actuate physical controls or automate enforcement decisions.
-- **Graceful Degradation**: Missing API keys, short history windows, and poor gradient fits are all handled with clearly communicated confidence penalties rather than errors.
+### Prerequisites
+
+- Python 3.11+
+- Node.js 20+
+- Redis
+- Supabase project (or any PostgreSQL DB)
+
+### 1. Environment
+
+```bash
+cp .env.example .env
+# fill in SUPABASE_DB_URL, REDIS_URL, DJANGO_SECRET_KEY, APP_PASSWORD, API keys
+```
+
+### 2. Install dependencies
+
+```bash
+# Backend
+cd backend
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py seed_users   # creates users from APP_PASSWORD
+
+# Frontend
+cd ../frontend
+npm install
+```
+
+### 3. Start everything
+
+```bash
+# From project root (development)
+python app.py
+```
+
+This starts Django on `:8000` (internal) and Next.js on `:3000` (public).
+Open `http://localhost:3000` → log in → run an analysis.
+
+### 4. Celery worker (separate terminal)
+
+```bash
+cd backend && source venv/bin/activate
+celery -A core worker --loglevel=info
+```
+
+### Running components separately
+
+If you prefer to run without `app.py`:
+
+```bash
+# Django
+cd backend && python manage.py runserver
+
+# Next.js (in another terminal)
+cd frontend && npm run dev
+```
+
+When running separately, add `DJANGO_INTERNAL_URL=http://localhost:8000` to
+`frontend/.env.local` so Next.js rewrites can reach Django.
 
 ---
 
-## Documentation
+## API
 
-- [Technical Report](technical_report.md) — Engineering details, mathematical models, confidence scoring, and visualization architecture
-- [Phase Plan](documents/phase_plan.md) — Development roadmap
-- [Metrics Guide](documents/metrics.md) — Metric definitions and formulas
-- [Database Architecture](documents/database.md) — Schema, indexing, and persistence design
-- [Security & Privacy](documents/security.md) — API key management, and privacy guarantees
+All paths below are served through Next.js rewrites — the browser never connects directly to Django.
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/auth/login` | Session login (`{username, password}`) |
+| `POST` | `/auth/logout` | Clear session |
+| `POST` | `/analyze` | Queue analysis → `{task_id}` |
+| `GET` | `/result/{task_id}` | Poll result from Redis |
+| `GET` | `/history` | Paginated telemetry (`?limit=&location=&anomaly_only=`) |
+| `GET` | `/latest` | Latest result per location (`?location=`) |
+
+---
+
+## Project Structure
+
+```
+app.py                  ← single entry point: starts Django + Next.js
+backend/
+├── core/               Django project (settings/, urls.py, wsgi.py, celery.py)
+├── api/                DRF views, serializers, auth
+├── auth_app/           login/logout + seed_users management command
+├── tasks/              analyze_crowd Celery task
+├── cache/              Redis key helpers, state serialization
+├── models/             CrowdTelemetry (unmanaged), AnalysisTask ORM
+└── services/
+    ├── signals/        tomtom.py · weather.py · geocoder.py
+    ├── metrics/        compression.py
+    ├── engine/         classifier.py · anomaly.py
+    ├── interventions/  recommender.py
+    └── data_layer/     vectorizer.py · database.py
+
+frontend/
+├── next.config.ts      API rewrites → Django internal URL
+├── app/                login/ · dashboard/ · history/
+├── components/         NavBar · StateBanner · RiskBar · MetricsGrid
+│                       Charts · InterventionPanel
+└── lib/                types.ts · api.ts (relative-URL fetch client)
+```
+
+---
+
+## Redis Key Schema
+
+| Key | TTL | Contents |
+|---|---|---|
+| `cpse:result:{task_id}` | 1 h | Full analysis result JSON |
+| `cpse:last:{location}` | 24 h | Latest result per location |
+| `cpse:state:{location}` | 24 h | Serialized CrowdMetrics + AnomalyDetector state |
+| `cpse:weather:{lat}:{lon}` | 10 min | Cached weather API response |
+| `cpse:lock:{location}` | 30 s | Per-location concurrency lock |
+
+---
+
+## Configuration
+
+`config.yaml` at project root controls API endpoints, simulation parameters, and metric
+thresholds. The backend loads it at startup via `backend/utils/config_loader.py`.
+
+---
+
+## Deployment
+
+```bash
+# Production mode — Gunicorn + next start
+APP_ENV=prod python app.py
+```
+
+Or as separate systemd units (Gunicorn, Celery, Next.js), with Cloudflare Tunnel
+pointing to `http://localhost:3000`.
+
+```bash
+cloudflared tunnel run cpse
+```
+
+See `ARCHITECTURE.md` for the full deployment section.
