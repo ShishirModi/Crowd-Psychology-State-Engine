@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import NavBar from '@/components/NavBar'
+import StateBanner from '@/components/StateBanner'
+import RiskBar from '@/components/RiskBar'
 import { analyze, pollResult } from '@/lib/api'
 import type { AnalyzeParams, PollResponse, AnalysisResult } from '@/lib/types'
 
@@ -174,11 +176,20 @@ export default function DashboardPage() {
           <div className="text-sm text-slate-500 animate-pulse">Running analysis…</div>
         )}
 
-        {/* Result area — raw JSON for now, replaced in Tasks 4–7 */}
+        {/* Result area */}
         {doneResult && (
-          <pre className="text-xs bg-white border border-slate-200 rounded p-4 overflow-auto max-h-96">
-            {JSON.stringify(doneResult, null, 2)}
-          </pre>
+          <div>
+            <StateBanner
+              state={doneResult.state}
+              confidence={doneResult.confidence}
+              summary={doneResult.breakdown.state_info?.summary}
+            />
+            <RiskBar
+              score={doneResult.risk_score}
+              verdict={doneResult.breakdown.risk_score?.verdict}
+              formula={doneResult.breakdown.risk_score?.formula}
+            />
+          </div>
         )}
       </main>
     </div>
