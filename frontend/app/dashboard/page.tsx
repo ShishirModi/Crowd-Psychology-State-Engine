@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import NavBar from '@/components/NavBar'
 import StateBanner from '@/components/StateBanner'
 import RiskBar from '@/components/RiskBar'
+import MetricsGrid from '@/components/MetricsGrid'
 import { analyze, pollResult } from '@/lib/api'
 import type { AnalyzeParams, PollResponse, AnalysisResult } from '@/lib/types'
 
@@ -189,6 +190,7 @@ export default function DashboardPage() {
               verdict={doneResult.breakdown.risk_score?.verdict}
               formula={doneResult.breakdown.risk_score?.formula}
             />
+            <MetricsGrid result={doneResult} />
           </div>
         )}
       </main>
