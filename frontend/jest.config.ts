@@ -10,7 +10,7 @@ const config: Config = {
     '^@/(.*)$': '<rootDir>/$1',
     '\\.(css|scss)$': '<rootDir>/__mocks__/fileMock.js',
   },
-  testMatch: ['**/__tests__/**/*.test.ts'],
+  testMatch: ['**/__tests__/**/*.test.{ts,tsx}'],
 }
 
 export default config

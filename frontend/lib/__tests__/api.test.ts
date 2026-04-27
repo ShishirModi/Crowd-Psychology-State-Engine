@@ -12,7 +12,7 @@ function mockFetch(body: unknown, status = 200) {
   ;(global.fetch as jest.Mock).mockResolvedValueOnce({
     ok: status < 400,
     status,
-    json: async () => body,
+    text: async () => JSON.stringify(body),
   })
 }
 

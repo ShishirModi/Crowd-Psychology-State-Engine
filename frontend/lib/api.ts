@@ -1,4 +1,4 @@
-import type { AnalysisResult, AnalyzeParams, HistoryRecord } from './types'
+import type { AnalysisResult, AnalyzeParams, HistoryRecord, PollResponse } from './types'
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 
@@ -8,8 +8,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { 'Content-Type': 'application/json' },
     ...init,
   })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error ?? data.detail ?? 'Request failed')
+  const text = await res.text()
+  const data = text ? JSON.parse(text) : {}
+  if (!res.ok) throw new Error(data?.error ?? data?.detail ?? `HTTP ${res.status}`)
   return data as T
 }
 
@@ -31,7 +32,7 @@ export async function analyze(params: AnalyzeParams): Promise<{ task_id: string 
   return request('/analyze', { method: 'POST', body: JSON.stringify(params) })
 }
 
-export async function pollResult(taskId: string): Promise<AnalysisResult> {
+export async function pollResult(taskId: string): Promise<PollResponse> {
   return request(`/result/${taskId}`)
 }
 
@@ -43,10 +44,14 @@ export async function getHistory(params?: {
   const qs = new URLSearchParams()
   if (params?.limit) qs.set('limit', String(params.limit))
   if (params?.location) qs.set('location', params.location)
-  if (params?.anomaly_only) qs.set('anomaly_only', 'true')
+  if (params?.anomaly_only !== undefined) qs.set('anomaly_only', String(params.anomaly_only))
   return request(`/history?${qs}`)
 }
 
 export async function getLatest(location: string): Promise<AnalysisResult | null> {
-  return request(`/latest?location=${encodeURIComponent(location)}`)
+  try {
+    return await request(`/latest?location=${encodeURIComponent(location)}`)
+  } catch {
+    return null
+  }
 }

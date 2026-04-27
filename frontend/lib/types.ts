@@ -69,3 +69,7 @@ export interface AnalyzeParams {
   env_width_factor: number
   env_event_active: boolean
 }
+
+export type PollResponse =
+  | { status: 'pending'; task_id: string }
+  | AnalysisResult
